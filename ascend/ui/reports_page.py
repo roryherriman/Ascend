@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -30,12 +30,13 @@ from ascend.data.repositories import ReportRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.services.sync_service import sync_report_by_code
+from ascend.services.zone_data import label_for_difficulty
 from ascend.ui.dialogs import ReportCodeDialog, confirm, show_error, show_info
 from ascend.ui.widgets import BackgroundTaskPanel, make_badge
 
 COLUMNS = [
     "Title", "Code", "Guild / Owner", "Date", "Encounter(s)", "Difficulty",
-    "Pulls", "Kill / Progression", "Character", "Spec", "Analysis Status",
+    "Pulls", "Kill / Progression", "Character", "Class", "Analysis Status",
 ]
 
 
@@ -49,6 +50,8 @@ def _format_date(epoch_ms: float | None) -> str:
 
 
 class ReportsPage(QWidget):
+    view_raid_night_requested = Signal(int)
+
     def __init__(
         self,
         db: Database,
@@ -102,6 +105,10 @@ class ReportsPage(QWidget):
         self.analyze_button.setToolTip("Available in Phase 2/3 (pull-level analysis).")
         toolbar.addWidget(self.analyze_button)
 
+        self.view_summary_button = QPushButton("View Raid Night Summary")
+        self.view_summary_button.clicked.connect(self._on_view_raid_night_summary)
+        toolbar.addWidget(self.view_summary_button)
+
         self.delete_button = QPushButton("Delete Local Data")
         self.delete_button.setObjectName("dangerButton")
         self.delete_button.clicked.connect(self._on_delete_local_data)
@@ -143,17 +150,34 @@ class ReportsPage(QWidget):
             encounter_names = sorted({f.name for f in fights if f.name})
             kills = sum(1 for f in fights if f.kill)
             wipes = sum(1 for f in fights if f.kill is False)
+
+            difficulty_labels = sorted({
+                label_for_difficulty(self.db, report.zone_id, f.difficulty)
+                for f in fights if f.difficulty is not None
+            } - {"--"})
+
+            tracked = self.repo.tracked_characters_for_report(report.id) if report.id else []
+            character_text = ", ".join(c.display_name for c in tracked) if tracked else ""
+            class_text = ""
+            if tracked and report.id:
+                participants = [
+                    p for f in fights for p in self.repo.participants_for_fight(f.id)
+                    if p.character_id == tracked[0].id
+                ]
+                classes = sorted({p.class_name for p in participants if p.class_name})
+                class_text = ", ".join(classes)
+
             values = [
                 report.title or "",
                 report.report_code,
                 report.guild_name or report.owner_name or "",
                 _format_date(report.start_time),
                 ", ".join(encounter_names) if encounter_names else "",
-                "",  # Difficulty varies per fight; shown in Encounter Analysis (Phase 2)
+                ", ".join(difficulty_labels),
                 str(len(fights)),
                 f"{kills} kill / {wipes} wipe" if fights else "",
-                "",  # Character mapping arrives with Phase 2 analysis
-                "",  # Spec mapping arrives with Phase 2 analysis
+                character_text,
+                class_text,
                 "",  # Analysis Status - rendered as a badge widget below
             ]
             for col, value in enumerate(values):
@@ -267,6 +291,13 @@ class ReportsPage(QWidget):
         ):
             self.repo.delete_report(report.id)
             self.reload()
+
+    def _on_view_raid_night_summary(self) -> None:
+        report = self._selected_report()
+        if report is None:
+            show_error(self, "No selection", "Select a report to view its Raid Night Summary first.")
+            return
+        self.view_raid_night_requested.emit(report.id)
 
     def _on_open_on_wcl(self) -> None:
         report = self._selected_report()

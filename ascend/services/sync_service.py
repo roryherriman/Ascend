@@ -24,6 +24,7 @@ from ascend.data.repositories import (
 )
 from ascend.services.background_worker import CancellationToken
 from ascend.services.character_detection import match_character
+from ascend.services.zone_data import ensure_zone_difficulties_cached
 
 
 class ReportCodeNotFoundError(Exception):
@@ -79,6 +80,14 @@ def sync_report_by_code(
             end_time=raw.get("endTime"),
         )
         report = reports_repo.upsert_report(report)
+
+        if report.zone_id is not None:
+            # Best-effort: difficulty labels are a display nicety, not worth
+            # failing the whole sync over if this secondary lookup errors.
+            try:
+                ensure_zone_difficulties_cached(db, client, report.zone_id)
+            except Exception:  # noqa: BLE001 - see comment above
+                pass
 
         master_data = raw.get("masterData") or {}
         actors_by_id = {
