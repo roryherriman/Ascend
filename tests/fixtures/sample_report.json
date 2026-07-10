@@ -1,0 +1,41 @@
+{
+  "code": "AbCdEfGh123456",
+  "title": "Sanitized Test Raid Night",
+  "startTime": 1700000000000,
+  "endTime": 1700010000000,
+  "zone": {
+    "id": 42,
+    "name": "Test Raid Zone"
+  },
+  "owner": {
+    "name": "TestOwner"
+  },
+  "guild": {
+    "name": "Test Guild",
+    "server": {
+      "name": "Stormrage"
+    }
+  },
+  "fights": [
+    {
+      "id": 1,
+      "name": "Test Boss One",
+      "encounterID": 1001,
+      "difficulty": 5,
+      "kill": false,
+      "startTime": 0,
+      "endTime": 120000,
+      "friendlyPlayers": [1, 2, 3]
+    },
+    {
+      "id": 2,
+      "name": "Test Boss One",
+      "encounterID": 1001,
+      "difficulty": 5,
+      "kill": true,
+      "startTime": 130000,
+      "endTime": 300000,
+      "friendlyPlayers": [1, 2, 3]
+    }
+  ]
+}
