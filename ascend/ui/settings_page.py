@@ -177,9 +177,11 @@ class SettingsPage(QWidget):
         self.guild_name_edit.setPlaceholderText("e.g. Example Guild Name")
         form.addRow("Guild Name:", self.guild_name_edit)
 
-        self.current_tier_edit = QLineEdit()
-        self.current_tier_edit.setPlaceholderText("e.g. Liberation of Undermine")
-        form.addRow("Current Raid Tier:", self.current_tier_edit)
+        from ascend.data.wow_data import WOW_RAID_TIERS
+        self.current_tier_combo = QComboBox()
+        self.current_tier_combo.setEditable(True)
+        self.current_tier_combo.addItems(WOW_RAID_TIERS)
+        form.addRow("Current Raid Tier:", self.current_tier_combo)
 
         self.guild_rank_edit = QLineEdit()
         self.guild_rank_edit.setPlaceholderText("e.g. Officer, Raider, Rank 3")
@@ -358,7 +360,9 @@ class SettingsPage(QWidget):
         self.client_id_edit.setText(self.settings_repo.get("wcl_client_id", ""))
         self.client_secret_edit.setText(self.secure_storage.get_client_secret() or "")
         self.guild_name_edit.setText(self.settings_repo.get("guild_name", ""))
-        self.current_tier_edit.setText(self.settings_repo.get("current_tier", ""))
+        from ascend.data.wow_data import WOW_RAID_TIERS
+        saved_tier = self.settings_repo.get("current_tier", "")
+        self.current_tier_combo.setCurrentText(saved_tier if saved_tier else (WOW_RAID_TIERS[0] if WOW_RAID_TIERS else ""))
         self.guild_rank_edit.setText(self.settings_repo.get("guild_us_rank", ""))
         self.progression_weight_spin.setValue(self.settings_repo.get("progression_weight_multiplier", 1.0))
         self.farm_weight_spin.setValue(self.settings_repo.get("farm_weight_multiplier", 0.4))
@@ -412,7 +416,7 @@ class SettingsPage(QWidget):
         self.settings_repo.set("wcl_client_id", self.client_id_edit.text().strip())
         self.secure_storage.set_client_secret(self.client_secret_edit.text().strip() or None)
         self.settings_repo.set("guild_name", self.guild_name_edit.text().strip())
-        self.settings_repo.set("current_tier", self.current_tier_edit.text().strip())
+        self.settings_repo.set("current_tier", self.current_tier_combo.currentText().strip())
         self.settings_repo.set("guild_us_rank", self.guild_rank_edit.text().strip())
         self.settings_repo.set("progression_weight_multiplier", self.progression_weight_spin.value())
         self.settings_repo.set("farm_weight_multiplier", self.farm_weight_spin.value())

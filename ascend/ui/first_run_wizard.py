@@ -227,25 +227,26 @@ class TierAndRankPage(QWizardPage):
         self.settings_repo = settings_repo
         self.setTitle("Raid Context")
 
-        form = QFormLayout(self)
-        self.tier_edit = QLineEdit(self.settings_repo.get("current_tier", ""))
-        self.tier_edit.setPlaceholderText("e.g. Liberation of Undermine")
-        form.addRow("Current Raid Tier:", self.tier_edit)
+        from PySide6.QtWidgets import QComboBox
+        from ascend.data.wow_data import WOW_RAID_TIERS
 
-        note = QLabel(
-            "API-backed raid tier selection with a searchable dropdown is coming in a future update. "
-            "For now, enter the name of the current tier you are progressing."
-        )
-        note.setProperty("class", "muted")
-        note.setWordWrap(True)
-        form.addRow("", note)
+        form = QFormLayout(self)
+        self.tier_combo = QComboBox()
+        self.tier_combo.setEditable(True)
+        self.tier_combo.addItems(WOW_RAID_TIERS)
+        saved_tier = self.settings_repo.get("current_tier", "")
+        if saved_tier in WOW_RAID_TIERS:
+            self.tier_combo.setCurrentText(saved_tier)
+        elif saved_tier:
+            self.tier_combo.setCurrentText(saved_tier)
+        form.addRow("Current Raid Tier:", self.tier_combo)
 
         self.rank_edit = QLineEdit(self.settings_repo.get("guild_us_rank", ""))
         self.rank_edit.setPlaceholderText("e.g. 42")
         form.addRow("Guild Rank:", self.rank_edit)
 
     def validatePage(self) -> bool:
-        self.settings_repo.set("current_tier", self.tier_edit.text().strip())
+        self.settings_repo.set("current_tier", self.tier_combo.currentText().strip())
         self.settings_repo.set("guild_us_rank", self.rank_edit.text().strip())
         return True
 

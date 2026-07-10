@@ -1,9 +1,11 @@
 """Shared dialogs: error reporting and character / report-code entry forms."""
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -66,6 +68,8 @@ class CharacterDialog(QDialog):
         if default_region and default_region in REGIONS:
             self.region_combo.setCurrentText(default_region)
         self.server_edit = QLineEdit()
+        self._setup_realm_completer()
+        self.region_combo.currentTextChanged.connect(self._update_realm_completer)
         self.wcl_id_edit = QLineEdit()
         self.class_combo = QComboBox()
         self.class_combo.addItems(CLASSES)
@@ -108,6 +112,22 @@ class CharacterDialog(QDialog):
             self.role_combo.setCurrentText(character.character_role)
             self.enabled_checkbox.setChecked(character.enabled)
             self.notes_edit.setPlainText(character.notes or "")
+
+    def _setup_realm_completer(self) -> None:
+        from ascend.data.wow_data import realms_for_region
+        realms = realms_for_region(self.region_combo.currentText())
+        completer = QCompleter(realms, self.server_edit)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.server_edit.setCompleter(completer)
+
+    def _update_realm_completer(self, region: str) -> None:
+        from ascend.data.wow_data import realms_for_region
+        realms = realms_for_region(region)
+        completer = QCompleter(realms, self.server_edit)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.server_edit.setCompleter(completer)
 
     def _on_accept(self) -> None:
         if not self.display_name_edit.text().strip() or not self.character_name_edit.text().strip():
