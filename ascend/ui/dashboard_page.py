@@ -1,24 +1,32 @@
-"""Dashboard page.
+"""Dashboard page - the visual showcase of Ascend.
 
 Ships the primary "Analyze a Raid Night" entry point (URL/code input -> basic
-report retrieval) plus placeholder metric cards. Full raid-night analysis
-(character detection, scoring, insights) lands in Phase 2/3 - Phase 1 only
-validates the URL and performs basic report/fight retrieval.
+report retrieval), a hero row (score/character/guild-rank), key metric
+cards, a recent-raid-nights table, strengths/improvement panels, and trend
+chart placeholders. Full raid-night analysis (character detection, scoring,
+insights) lands in Phase 2/3 - Phase 1 only validates the URL and performs
+basic report/fight retrieval; everything analysis-shaped is intentionally
+shown as "--" or an empty state rather than invented.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QUrl, Signal
+from datetime import datetime, timezone
+
+from PySide6.QtCore import QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -26,18 +34,16 @@ from PySide6.QtWidgets import (
 from ascend.api.client import WCLClient
 from ascend.api.url_parser import InvalidReportReferenceError, build_report_url, parse_report_reference
 from ascend.data.database import Database
-from ascend.data.repositories import SettingsRepository
+from ascend.data.repositories import ReportRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.services.sync_service import sync_report_by_code
+from ascend.theme import apply_card_elevation
 from ascend.ui.dialogs import show_error, show_info
-from ascend.ui.widgets import BackgroundTaskPanel, StatCard
+from ascend.ui.icons import icon
+from ascend.ui.widgets import BackgroundTaskPanel, InfoCard, MetricCard, make_badge
 
-STAT_DEFINITIONS: list[tuple[str, str]] = [
-    ("Overall Progression Score", "Requires synced + analyzed reports (Phase 2/3)."),
-    ("Current Classification", "Below Average / Average / Above Average / Strong / Standout"),
-    ("Confidence", "Depends on sample size once analysis is available."),
-    ("Current Guild Rank", "Set in Settings; shown here for quick reference."),
+KEY_METRICS: list[tuple[str, str]] = [
     ("Progression Pulls Analyzed", "Count of progression pulls with objective metrics."),
     ("Progression Bosses Analyzed", "Distinct progression encounters analyzed."),
     ("Raid Nights Analyzed", "Count of raid nights (reports) analyzed."),
@@ -47,12 +53,26 @@ STAT_DEFINITIONS: list[tuple[str, str]] = [
     ("Median Roster-Relative Performance", "Requires roster comparison data (Phase 2)."),
     ("Damage Consistency", "Requires pull-to-pull damage analysis (Phase 2/3)."),
     ("Learning-Speed Rating", "Requires trend analysis across pulls (Phase 3)."),
-    ("Strongest Category", "Derived from scoring category breakdown (Phase 3/4)."),
-    ("Biggest Improvement Area", "Derived from scoring category breakdown (Phase 3/4)."),
+]
+
+CHART_PLACEHOLDERS = [
+    ("Score Over Time", "trends"),
+    ("Death Rate Over Time", "deaths"),
+    ("Priority-Target Damage", "encounter"),
+    ("Progression vs. Farm", "encounter_progression"),
 ]
 
 RECENT_URLS_SETTING_KEY = "recent_report_urls"
 MAX_RECENT_URLS = 5
+
+
+def _format_date(epoch_ms: float | None) -> str:
+    if not epoch_ms:
+        return "--"
+    try:
+        return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    except (OSError, OverflowError, ValueError):
+        return "--"
 
 
 class DashboardPage(QWidget):
@@ -70,60 +90,64 @@ class DashboardPage(QWidget):
         self.secure_storage = secure_storage
         self.task_manager = task_manager
         self.settings_repo = SettingsRepository(db)
+        self.reports_repo = ReportRepository(db)
         self._active_task = None
 
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(24, 24, 24, 24)
+        outer_layout.setContentsMargins(24, 20, 24, 0)
+        outer_layout.setSpacing(8)
 
+        header = QVBoxLayout()
+        header.setSpacing(2)
         title = QLabel("Dashboard")
         title.setObjectName("pageTitle")
-        outer_layout.addWidget(title)
-
-        outer_layout.addWidget(self._build_analyze_card())
-
-        subtitle = QLabel(
-            "No performance data has been analyzed yet. Add characters and analyze a raid "
-            "night to begin - full scoring, classification, and charts are built out in later phases."
-        )
-        subtitle.setProperty("class", "muted")
-        subtitle.setWordWrap(True)
-        outer_layout.addWidget(subtitle)
+        header.addWidget(title)
+        description = QLabel("How am I performing? Start here.")
+        description.setObjectName("pageDescription")
+        header.addWidget(description)
+        outer_layout.addLayout(header)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(scroll.Shape.NoFrame)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        grid_container = QWidget()
-        grid = QGridLayout(grid_container)
-        grid.setContentsMargins(0, 16, 0, 0)
-        grid.setSpacing(12)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 12, 4, 24)
+        content_layout.setSpacing(16)
 
-        columns = 3
-        self.cards: dict[str, StatCard] = {}
-        for index, (title_text, subtext) in enumerate(STAT_DEFINITIONS):
-            card = StatCard(title_text, "--", subtext)
-            self.cards[title_text] = card
-            grid.addWidget(card, index // columns, index % columns)
+        content_layout.addWidget(self._build_analyze_card())
+        content_layout.addLayout(self._build_hero_row())
+        content_layout.addWidget(self._build_key_metrics())
+        content_layout.addLayout(self._build_middle_row())
+        content_layout.addWidget(self._build_chart_placeholders())
+        content_layout.addStretch()
 
-        for col in range(columns):
-            grid.setColumnStretch(col, 1)
-
-        scroll.setWidget(grid_container)
+        scroll.setWidget(content)
         outer_layout.addWidget(scroll, stretch=1)
 
-        charts_note = QLabel(
-            "Charts (score over time, death rate, first-death rate, progression DPS "
-            "consistency, priority-target damage, Mage vs. Warlock, progression vs. farm) "
-            "will appear here once report analysis is implemented in Phase 2/3."
-        )
-        charts_note.setProperty("class", "muted")
-        charts_note.setWordWrap(True)
-        charts_note.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        outer_layout.addWidget(charts_note)
+        self._refresh_recent_raid_nights()
 
-    def _build_analyze_card(self) -> QGroupBox:
-        card = QGroupBox("Analyze a Raid Night")
+    # -- Analyze card ---------------------------------------------------
+
+    def _build_analyze_card(self) -> QFrame:
+        card = QFrame()
+        card.setProperty("class", "card")
+        apply_card_elevation(card, blur_radius=28, y_offset=6)
         layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(10)
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(8)
+        icon_label = QLabel()
+        icon_label.setPixmap(icon("raid_night").pixmap(20, 20))
+        header_row.addWidget(icon_label)
+        header_label = QLabel("Analyze a Raid Night")
+        header_label.setStyleSheet("font-size: 15px; font-weight: 700;")
+        header_row.addWidget(header_label)
+        header_row.addStretch()
+        layout.addLayout(header_row)
 
         note = QLabel(
             "Phase 1 validates the URL and retrieves/stores the report and its pulls. "
@@ -174,6 +198,193 @@ class DashboardPage(QWidget):
         layout.addWidget(self.task_panel)
 
         return card
+
+    # -- Hero row: score / character / guild rank ------------------------
+
+    def _build_hero_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        score_card = QFrame()
+        score_card.setProperty("class", "card")
+        score_card.setMinimumHeight(140)
+        apply_card_elevation(score_card)
+        score_layout = QVBoxLayout(score_card)
+        score_layout.setContentsMargins(20, 16, 20, 16)
+        score_layout.setSpacing(6)
+
+        score_title = QLabel("OVERALL PROGRESSION SCORE")
+        score_title.setProperty("class", "muted")
+        score_title.setStyleSheet("font-size: 11px; font-weight: 700; letter-spacing: 0.6px;")
+        score_layout.addWidget(score_title)
+
+        score_value_row = QHBoxLayout()
+        score_value_row.setSpacing(12)
+        score_value = QLabel("--")
+        score_value.setStyleSheet("font-size: 44px; font-weight: 700;")
+        score_value_row.addWidget(score_value)
+
+        badges_col = QVBoxLayout()
+        badges_col.setSpacing(4)
+        classification_badge = make_badge("NOT YET CLASSIFIED", tone="neutral")
+        confidence_badge = make_badge("NO DATA", tone="neutral")
+        badges_col.addWidget(classification_badge)
+        badges_col.addWidget(confidence_badge)
+        score_value_row.addLayout(badges_col)
+        score_value_row.addStretch()
+        score_layout.addLayout(score_value_row)
+
+        score_note = QLabel("Analyze a raid night to calculate your score - Phase 2/3.")
+        score_note.setProperty("class", "muted")
+        score_note.setWordWrap(True)
+        score_layout.addWidget(score_note)
+        row.addWidget(score_card, stretch=2)
+
+        character_card = InfoCard("Character")
+        primary = self._primary_character_text()
+        character_value = QLabel(primary)
+        character_value.setStyleSheet("font-size: 15px; font-weight: 600;")
+        character_value.setWordWrap(True)
+        character_card.add_widget(character_value)
+        character_hint = QLabel("Manage characters on the Characters page.")
+        character_hint.setProperty("class", "muted")
+        character_hint.setWordWrap(True)
+        character_card.add_widget(character_hint)
+        row.addWidget(character_card, stretch=1)
+
+        guild_rank_card = InfoCard("Guild Rank")
+        guild_rank = self.settings_repo.get("guild_us_rank", "") if hasattr(self, "settings_repo") else ""
+        rank_value = QLabel(guild_rank or "--")
+        rank_value.setStyleSheet("font-size: 15px; font-weight: 600;")
+        guild_rank_card.add_widget(rank_value)
+        rank_hint = QLabel("Set in Settings.")
+        rank_hint.setProperty("class", "muted")
+        guild_rank_card.add_widget(rank_hint)
+        row.addWidget(guild_rank_card, stretch=1)
+
+        return row
+
+    def _primary_character_text(self) -> str:
+        from ascend.data.repositories import CharacterRepository
+
+        characters = CharacterRepository(self.db).list_all(enabled_only=True)
+        primary = next((c for c in characters if c.character_role == "primary"), None)
+        primary = primary or (characters[0] if characters else None)
+        if primary is None:
+            return "No character configured"
+        return f"{primary.display_name} ({primary.character_class or 'Unknown class'})"
+
+    # -- Key metrics grid -------------------------------------------------
+
+    def _build_key_metrics(self) -> QWidget:
+        container = QWidget()
+        grid = QGridLayout(container)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(12)
+        columns = 3
+        for index, (title_text, subtext) in enumerate(KEY_METRICS):
+            card = MetricCard(title_text, "--", subtext)
+            grid.addWidget(card, index // columns, index % columns)
+        for col in range(columns):
+            grid.setColumnStretch(col, 1)
+        return container
+
+    # -- Middle row: recent raid nights + strengths/improvements ---------
+
+    def _build_middle_row(self) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        recent_card = QFrame()
+        recent_card.setProperty("class", "card")
+        apply_card_elevation(recent_card)
+        recent_layout = QVBoxLayout(recent_card)
+        recent_layout.setContentsMargins(16, 14, 16, 14)
+        recent_title = QLabel("Recent Raid Nights")
+        recent_title.setStyleSheet("font-size: 13px; font-weight: 600;")
+        recent_layout.addWidget(recent_title)
+
+        self.recent_table = QTableWidget(0, 4)
+        self.recent_table.setHorizontalHeaderLabels(["Date", "Title", "Pulls", "Score"])
+        self.recent_table.verticalHeader().setVisible(False)
+        self.recent_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.recent_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.recent_table.setMinimumHeight(160)
+        self.recent_table.setAlternatingRowColors(True)
+        recent_layout.addWidget(self.recent_table)
+        row.addWidget(recent_card, stretch=2)
+
+        panels_col = QVBoxLayout()
+        panels_col.setSpacing(12)
+
+        strengths_card = InfoCard("Top Strengths")
+        strengths_placeholder = QLabel("No strengths identified yet - arrives with scoring in Phase 3.")
+        strengths_placeholder.setProperty("class", "muted")
+        strengths_placeholder.setWordWrap(True)
+        strengths_card.add_widget(strengths_placeholder)
+        panels_col.addWidget(strengths_card)
+
+        improvement_card = InfoCard("Priority Improvements")
+        improvement_placeholder = QLabel("No improvement areas identified yet - arrives with scoring in Phase 3.")
+        improvement_placeholder.setProperty("class", "muted")
+        improvement_placeholder.setWordWrap(True)
+        improvement_card.add_widget(improvement_placeholder)
+        panels_col.addWidget(improvement_card)
+
+        panels_widget = QWidget()
+        panels_widget.setLayout(panels_col)
+        row.addWidget(panels_widget, stretch=1)
+
+        return row
+
+    def _refresh_recent_raid_nights(self) -> None:
+        reports = self.reports_repo.list_all()[:8]
+        self.recent_table.setRowCount(len(reports))
+        for row_index, report in enumerate(reports):
+            values = [
+                _format_date(report.start_time),
+                report.title or report.report_code,
+                str(report.fight_count),
+                "--",
+            ]
+            for col, value in enumerate(values):
+                self.recent_table.setItem(row_index, col, QTableWidgetItem(value))
+
+    # -- Chart placeholders ------------------------------------------------
+
+    def _build_chart_placeholders(self) -> QWidget:
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
+        for title_text, icon_name in CHART_PLACEHOLDERS:
+            card = QFrame()
+            card.setProperty("class", "card")
+            card.setMinimumHeight(120)
+            layout = QVBoxLayout(card)
+            layout.setContentsMargins(16, 14, 16, 14)
+            layout.setSpacing(6)
+
+            icon_label = QLabel()
+            icon_label.setPixmap(icon(icon_name).pixmap(20, 20))
+            layout.addWidget(icon_label)
+
+            title_label = QLabel(title_text)
+            title_label.setStyleSheet("font-size: 12px; font-weight: 600;")
+            layout.addWidget(title_label)
+
+            note_label = QLabel("Chart appears once analysis data exists (Phase 2/3).")
+            note_label.setProperty("class", "muted")
+            note_label.setWordWrap(True)
+            note_label.setStyleSheet("font-size: 11px;")
+            layout.addWidget(note_label)
+            layout.addStretch()
+
+            row.addWidget(card)
+        return container
+
+    # -- recent URL handling -------------------------------------------------
 
     def _reload_recent_urls(self) -> None:
         recent = self.settings_repo.get(RECENT_URLS_SETTING_KEY, [])
@@ -251,6 +462,7 @@ class DashboardPage(QWidget):
             self.task_panel.reset()
             return
         self.task_panel.finish(f"Retrieved report {report.report_code}.")
+        self._refresh_recent_raid_nights()
         show_info(
             self, "Report retrieved",
             f"'{report.title or report.report_code}' was retrieved and stored. "

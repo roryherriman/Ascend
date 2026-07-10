@@ -19,7 +19,7 @@ def test_main_window_launches(tmp_path, qtbot):
     window, db = _make_window(tmp_path, qtbot)
     try:
         assert window.windowTitle() == "Ascend"
-        assert window.sidebar.list_widget.count() == len(NAV_ITEMS)
+        assert window.sidebar.selectable_section_count == len(NAV_ITEMS)
     finally:
         db.close()
 

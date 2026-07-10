@@ -31,7 +31,7 @@ from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.services.sync_service import sync_report_by_code
 from ascend.ui.dialogs import ReportCodeDialog, confirm, show_error, show_info
-from ascend.ui.widgets import BackgroundTaskPanel
+from ascend.ui.widgets import BackgroundTaskPanel, make_badge
 
 COLUMNS = [
     "Title", "Code", "Guild / Owner", "Date", "Encounter(s)", "Difficulty",
@@ -120,6 +120,8 @@ class ReportsPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSortingEnabled(True)
         layout.addWidget(self.table, stretch=1)
 
         self.task_panel = BackgroundTaskPanel()
@@ -134,6 +136,7 @@ class ReportsPage(QWidget):
         self._populate_table(self._reports)
 
     def _populate_table(self, reports: list[Report]) -> None:
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(reports))
         for row, report in enumerate(reports):
             fights = self.repo.fights_for_report(report.id) if report.id else []
@@ -151,7 +154,7 @@ class ReportsPage(QWidget):
                 f"{kills} kill / {wipes} wipe" if fights else "",
                 "",  # Character mapping arrives with Phase 2 analysis
                 "",  # Spec mapping arrives with Phase 2 analysis
-                report.analysis_status.replace("_", " ").title(),
+                "",  # Analysis Status - rendered as a badge widget below
             ]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -159,6 +162,16 @@ class ReportsPage(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole + 1, report.report_code)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, col, item)
+
+            status_tone = "success" if report.analysis_status == "analyzed" else "neutral"
+            badge = make_badge(report.analysis_status.replace("_", " ").upper(), tone=status_tone)
+            badge_wrap = QWidget()
+            badge_layout = QHBoxLayout(badge_wrap)
+            badge_layout.setContentsMargins(4, 2, 4, 2)
+            badge_layout.addWidget(badge)
+            badge_layout.addStretch()
+            self.table.setCellWidget(row, len(COLUMNS) - 1, badge_wrap)
+        self.table.setSortingEnabled(True)
 
     def _apply_filter(self, text: str) -> None:
         text = text.strip().lower()
