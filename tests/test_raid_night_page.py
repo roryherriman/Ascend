@@ -1,7 +1,7 @@
 from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
-from ascend.ui.raid_night_page import RaidNightSummaryPage
+from ascend.ui.raid_night_page import PullDetailDialog, RaidNightSummaryPage
 
 
 def _make_db(tmp_path):
@@ -90,5 +90,63 @@ def test_select_report_navigates_to_matching_entry(tmp_path, qtbot):
 
         page.select_report(second.id)
         assert page.report_combo.currentData() == second.id
+    finally:
+        db.close()
+
+
+def test_pull_detail_dialog_shows_fight_and_participants(tmp_path, qtbot):
+    db = _make_db(tmp_path)
+    try:
+        reports_repo = ReportRepository(db)
+        report = reports_repo.upsert_report(Report(report_code="ABC123", zone_id=44))
+        fight = reports_repo.upsert_fight(
+            Fight(
+                report_id=report.id, fight_id=7, name="Test Boss",
+                difficulty=5, kill=False, start_time=0, end_time=30000,
+            )
+        )
+        reports_repo.upsert_fight_participant(
+            FightParticipant(
+                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", class_name="Priest",
+            )
+        )
+
+        dialog = PullDetailDialog(db, report, fight, pull_number=3)
+        qtbot.addWidget(dialog)
+
+        assert "Test Boss" in dialog.windowTitle()
+        assert dialog.participants_table.rowCount() == 1
+        assert dialog.participants_table.item(0, 0).text() == "Kysarra"
+        assert dialog.evidence_button.text() == "Open This Pull on Warcraft Logs"
+    finally:
+        db.close()
+
+
+def test_double_clicking_a_pull_opens_its_detail_dialog(tmp_path, qtbot, monkeypatch):
+    db = _make_db(tmp_path)
+    try:
+        reports_repo = ReportRepository(db)
+        report = reports_repo.upsert_report(Report(report_code="ABC123", zone_id=44))
+        reports_repo.upsert_fight(
+            Fight(report_id=report.id, fight_id=1, name="Test Boss", kill=True, start_time=0, end_time=1000)
+        )
+
+        page = RaidNightSummaryPage(db)
+        qtbot.addWidget(page)
+
+        opened = {}
+
+        class FakeDialog:
+            def __init__(self, db_, report_, fight_, pull_number, parent=None):
+                opened["fight_name"] = fight_.name
+                opened["pull_number"] = pull_number
+
+            def exec(self):
+                opened["executed"] = True
+
+        monkeypatch.setattr("ascend.ui.raid_night_page.PullDetailDialog", FakeDialog)
+        page._on_pull_double_clicked(0, 0)
+
+        assert opened == {"fight_name": "Test Boss", "pull_number": 1, "executed": True}
     finally:
         db.close()
