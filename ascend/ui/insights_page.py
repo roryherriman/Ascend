@@ -270,7 +270,7 @@ class InsightsPage(QWidget):
         if self._empty_state is None:
             self._empty_state = AscendEmptyState(
                 title=title,
-                subtitle=subtitle,
+                description=subtitle,
                 icon_name="insights",
             )
             self._layout.insertWidget(self._layout.count() - 1, self._empty_state)
