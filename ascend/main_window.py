@@ -13,6 +13,7 @@ from ascend.ui.characters_page import CharactersPage, seed_initial_characters
 from ascend.ui.components import ToastOverlay
 from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.diagnostics import DiagnosticsPage
+from ascend.ui.encounter_page import EncounterAnalysisPage
 from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
 from ascend.ui.settings_page import SettingsPage
@@ -20,17 +21,6 @@ from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 # key -> (development phase, note, planned capabilities, icon name)
 PLACEHOLDER_META: dict[str, dict] = {
-    "encounter": dict(
-        phase=2,
-        note="Encounter Analysis will let you drill into one boss across pulls and raid nights.",
-        planned=[
-            "Pull-by-pull results with filters",
-            "Progression pull-range comparisons (1-10, 11-25, ...)",
-            "Priority-target damage",
-            "Mechanic-rule results",
-        ],
-        icon="encounter",
-    ),
     "deaths": dict(
         phase=3,
         note="Death Review will show the evidence behind every death - never labeling one avoidable without a basis.",
@@ -250,6 +240,8 @@ class MainWindow(QMainWindow):
             elif key == "raid_night":
                 page = RaidNightSummaryPage(self.db)
                 self.raid_night_page = page
+            elif key == "encounter":
+                page = EncounterAnalysisPage(self.db)
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
