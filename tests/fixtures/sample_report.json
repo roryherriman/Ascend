@@ -16,6 +16,13 @@
       "name": "Stormrage"
     }
   },
+  "masterData": {
+    "actors": [
+      { "id": 1, "name": "Kysarra", "server": "Stormrage", "subType": "Priest" },
+      { "id": 2, "name": "Someraider", "server": "Stormrage", "subType": "Warrior" },
+      { "id": 3, "name": "Otherraider", "server": "Stormrage", "subType": "Mage" }
+    ]
+  },
   "fights": [
     {
       "id": 1,

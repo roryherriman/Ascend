@@ -148,6 +148,25 @@ MIGRATIONS: list[Migration] = [
         );
         """,
     ),
+    Migration(
+        version=4,
+        description="Phase 2: fight participants (character detection)",
+        sql="""
+        CREATE TABLE IF NOT EXISTS fight_participants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fight_id INTEGER NOT NULL REFERENCES fights(id) ON DELETE CASCADE,
+            actor_id INTEGER NOT NULL,
+            name TEXT,
+            server TEXT,
+            class_name TEXT,
+            character_id INTEGER REFERENCES characters(id) ON DELETE SET NULL,
+            UNIQUE (fight_id, actor_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_fight_participants_character
+            ON fight_participants(character_id);
+        """,
+    ),
 ]
 
 

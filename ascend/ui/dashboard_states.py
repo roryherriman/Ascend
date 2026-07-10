@@ -614,10 +614,12 @@ class ActiveAnalyticsState(QWidget):
             boss_text = encounter_names[0] if encounter_names else "--"
             if len(encounter_names) > 1:
                 boss_text += f" +{len(encounter_names) - 1}"
+            tracked = self.reports_repo.tracked_characters_for_report(report.id) if report.id else []
+            character_text = tracked[0].display_name if tracked else "--"
             values = [
                 _format_date(report.start_time),
                 report.guild_name or report.owner_name or "--",
-                "--",
+                character_text,
                 boss_text,
                 str(len(fights)),
                 "--",

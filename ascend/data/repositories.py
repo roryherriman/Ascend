@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ascend.data.database import Database
-from ascend.data.models import Character, Fight, Report, SyncHistoryEntry
+from ascend.data.models import Character, Fight, FightParticipant, Report, SyncHistoryEntry
 
 
 def _now_iso() -> str:
@@ -236,6 +236,71 @@ class ReportRepository:
 
     def delete_report(self, report_id: int) -> None:
         self.db.execute("DELETE FROM reports WHERE id = ?", (report_id,))
+
+    def upsert_fight_participant(self, participant: FightParticipant) -> FightParticipant:
+        """Insert or update a participant keyed by (fight_id, actor_id) - the
+        WCL report-scoped actor id, not a global/persistent id."""
+        self.db.execute(
+            """
+            INSERT INTO fight_participants (fight_id, actor_id, name, server, class_name, character_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(fight_id, actor_id) DO UPDATE SET
+                name = excluded.name,
+                server = excluded.server,
+                class_name = excluded.class_name,
+                character_id = excluded.character_id
+            """,
+            (
+                participant.fight_id,
+                participant.actor_id,
+                participant.name,
+                participant.server,
+                participant.class_name,
+                participant.character_id,
+            ),
+        )
+        row = self.db.query_one(
+            "SELECT id FROM fight_participants WHERE fight_id = ? AND actor_id = ?",
+            (participant.fight_id, participant.actor_id),
+        )
+        participant.id = row["id"] if row else None
+        return participant
+
+    def participants_for_fight(self, fight_id: int) -> list[FightParticipant]:
+        rows = self.db.query_all(
+            "SELECT * FROM fight_participants WHERE fight_id = ? ORDER BY name COLLATE NOCASE",
+            (fight_id,),
+        )
+        return [self._participant_row_to_model(row) for row in rows]
+
+    def tracked_characters_for_report(self, report_id: int) -> list[Character]:
+        """Distinct tracked Characters detected among this report's fights,
+        ordered by how many fights they appear in (most first)."""
+        rows = self.db.query_all(
+            """
+            SELECT c.*, COUNT(*) AS appearances
+            FROM fight_participants fp
+            JOIN fights f ON f.id = fp.fight_id
+            JOIN characters c ON c.id = fp.character_id
+            WHERE f.report_id = ?
+            GROUP BY c.id
+            ORDER BY appearances DESC
+            """,
+            (report_id,),
+        )
+        return [CharacterRepository._row_to_model(row) for row in rows]
+
+    @staticmethod
+    def _participant_row_to_model(row: sqlite3.Row) -> FightParticipant:
+        return FightParticipant(
+            id=row["id"],
+            fight_id=row["fight_id"],
+            actor_id=row["actor_id"],
+            name=row["name"],
+            server=row["server"],
+            class_name=row["class_name"],
+            character_id=row["character_id"],
+        )
 
     @staticmethod
     def _row_to_model(row: sqlite3.Row) -> Report:

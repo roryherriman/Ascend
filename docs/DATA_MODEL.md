@@ -18,6 +18,12 @@ place; new phases add new migrations rather than editing old ones.
 | `session_operations` | App-lifecycle tracking for crash/unclean-shutdown detection |
 | `analysis_runs` | Which app/analysis-engine/scoring-model version produced an analysis (schema only until Phase 2/3's engine exists) |
 
+## Phase 2 schema (migration 4)
+
+| Table | Purpose |
+|---|---|
+| `fight_participants` | One row per player actor present in a fight (from `ReportMasterData.actors`, matched against `Fight.friendlyPlayers`), unique on `(fight_id, actor_id)`. `character_id` is set when the actor's name+server matches a tracked Character - see `ascend/services/character_detection.py` - and is `NULL` otherwise (an untracked raid-team member). |
+
 Secrets are deliberately **not** in this list - see `docs/SECURITY.md`.
 
 ## Duplicate prevention
