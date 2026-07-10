@@ -1,10 +1,13 @@
 """Settings page - credentials, scoring configuration, cache/network, and data locations.
 
+
 Secrets (Warcraft Logs client secret, Discord webhook URL) are stored via
 SecureStorage (Windows Credential Manager, or an encrypted/obfuscated local
 fallback with a visible warning) and are never written to SQLite.
 """
 from __future__ import annotations
+
+from pathlib import Path
 
 import requests
 from PySide6.QtWidgets import (
@@ -123,6 +126,7 @@ class SettingsPage(QWidget):
         form_layout.addWidget(self._build_discord_group())
         form_layout.addWidget(self._build_theme_group())
         form_layout.addWidget(self._build_data_location_group())
+        form_layout.addWidget(self._build_data_management_group())
         form_layout.addWidget(self._build_demo_mode_group())
         form_layout.addStretch()
 
@@ -331,6 +335,35 @@ class SettingsPage(QWidget):
 
         return group
 
+    def _build_data_management_group(self) -> QGroupBox:
+        group = QGroupBox("Data Management")
+        layout = QVBoxLayout(group)
+
+        open_button = QPushButton("Open Data Folder")
+        open_button.clicked.connect(self._on_open_data_folder)
+        layout.addWidget(open_button)
+
+        self.db_size_label = QLabel()
+        self.db_size_label.setProperty("class", "muted")
+        layout.addWidget(self.db_size_label)
+
+        note = QLabel(
+            "Your data is stored locally and never uploaded. "
+            "Use File > Back Up Ascend Data to save a timestamped copy."
+        )
+        note.setProperty("class", "muted")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        return group
+
+    def _on_open_data_folder(self) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        folder = default_app_data_root()
+        folder.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
     def _build_demo_mode_group(self) -> QGroupBox:
         group = QGroupBox("Demo Mode")
         form = QFormLayout(group)
@@ -386,6 +419,15 @@ class SettingsPage(QWidget):
         self.data_dir_edit.setText(config.get("data_dir", str(app_root)))
         self.export_dir_edit.setText(config.get("export_dir", str(app_root / "exports")))
         self.demo_mode_checkbox.setChecked(bool(config.get("demo_mode", False)))
+
+        db_path = Path(config.get("data_dir", str(app_root))) / (
+            "ascend_demo.db" if config.get("demo_mode") else "ascend.db"
+        )
+        if db_path.exists():
+            size_kb = db_path.stat().st_size / 1024
+            self.db_size_label.setText(f"Database: {size_kb:.1f} KB  ({db_path.name})")
+        else:
+            self.db_size_label.setText("Database: not yet created")
 
         self._refresh_security_banner()
 

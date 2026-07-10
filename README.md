@@ -76,8 +76,14 @@ Parse color tells you how you compare to everyone who's ever done the fight. Asc
 
 1. Install Ascend using the installer from the [Releases page](https://github.com/roryherriman/Ascende/releases).
 2. Launch Ascend from the Start Menu.
-3. The setup wizard will ask for your Warcraft Logs API credentials (see below).
-4. Add your character, paste a Warcraft Logs report URL, and click **Analyze**.
+3. The setup wizard walks you through:
+   - **Your profile** — display name and preferred region (US, EU, KR, TW, CN)
+   - **Warcraft Logs credentials** — client ID and secret from the WCL API
+   - **Connection test** — verify Ascend can reach Warcraft Logs
+   - **Your characters** — name, realm (autocomplete), class, and role (tank/healer/ranged/melee)
+   - **Raid context** — current tier (dropdown) and guild rank
+   - **Scoring preferences**, Discord webhook, data folder, and optional first report import
+4. Paste a Warcraft Logs report URL in the Dashboard and click **Analyze**.
 
 ### Getting Warcraft Logs API credentials
 
