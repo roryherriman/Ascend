@@ -237,6 +237,52 @@ class ReportRepository:
     def delete_report(self, report_id: int) -> None:
         self.db.execute("DELETE FROM reports WHERE id = ?", (report_id,))
 
+    def distinct_encounters(self) -> list[tuple[int, str]]:
+        """Every (encounter_id, name) pair seen across all synced fights,
+        ordered by name - the source list for Encounter Analysis's picker."""
+        rows = self.db.query_all(
+            """
+            SELECT DISTINCT encounter_id, name FROM fights
+            WHERE encounter_id IS NOT NULL AND name IS NOT NULL
+            ORDER BY name COLLATE NOCASE
+            """
+        )
+        return [(row["encounter_id"], row["name"]) for row in rows]
+
+    def fights_for_encounter(self, encounter_id: int) -> list[tuple[Report, Fight]]:
+        """Every fight of this encounter across all reports, paired with its
+        report, ordered chronologically by absolute time (a Fight's
+        start_time is relative to its own report, not comparable across
+        reports on its own)."""
+        rows = self.db.query_all(
+            """
+            SELECT r.*, f.id AS f_id, f.report_id AS f_report_id, f.fight_id AS f_fight_id,
+                   f.name AS f_name, f.encounter_id AS f_encounter_id, f.difficulty AS f_difficulty,
+                   f.kill AS f_kill, f.start_time AS f_start_time, f.end_time AS f_end_time
+            FROM fights f
+            JOIN reports r ON r.id = f.report_id
+            WHERE f.encounter_id = ?
+            ORDER BY (r.start_time + f.start_time) ASC
+            """,
+            (encounter_id,),
+        )
+        results = []
+        for row in rows:
+            report = self._row_to_model(row)
+            fight = Fight(
+                id=row["f_id"],
+                report_id=row["f_report_id"],
+                fight_id=row["f_fight_id"],
+                name=row["f_name"],
+                encounter_id=row["f_encounter_id"],
+                difficulty=row["f_difficulty"],
+                kill=bool(row["f_kill"]) if row["f_kill"] is not None else None,
+                start_time=row["f_start_time"],
+                end_time=row["f_end_time"],
+            )
+            results.append((report, fight))
+        return results
+
     def upsert_fight_participant(self, participant: FightParticipant) -> FightParticipant:
         """Insert or update a participant keyed by (fight_id, actor_id) - the
         WCL report-scoped actor id, not a global/persistent id."""
