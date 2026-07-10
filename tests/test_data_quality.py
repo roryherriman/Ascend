@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.services.data_quality import (
@@ -20,7 +20,7 @@ def test_character_confidence_is_no_data_when_nothing_synced(tmp_path):
     db = _make_db(tmp_path)
     try:
         CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         result = character_identity_confidence(db)
         assert len(result) == 1
@@ -33,13 +33,13 @@ def test_character_confidence_is_not_detected_when_reports_exist_but_no_match(tm
     db = _make_db(tmp_path)
     try:
         CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="ABC"))
         fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
-            FightParticipant(fight_id=fight.id, actor_id=1, name="Someoneelse", server="Stormrage")
+            FightParticipant(fight_id=fight.id, actor_id=1, name="Someoneelse", server="Proudmoore")
         )
 
         result = character_identity_confidence(db)
@@ -53,14 +53,14 @@ def test_character_confidence_is_detected_when_matched(tmp_path):
     db = _make_db(tmp_path)
     try:
         character = CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="ABC"))
         fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id
             )
         )
 

@@ -1,4 +1,4 @@
-"""Tests for ascend/analysis/scoring_engine.py.
+﻿"""Tests for ascend/analysis/scoring_engine.py.
 
 Validates overall score computation, coverage-ratio gating, classification
 thresholds, confidence propagation, and structural completeness of the
@@ -26,9 +26,9 @@ def _make_db(tmp_path):
     return db
 
 
-def _make_character(db, name="Kysarra"):
+def _make_character(db, name="Aeloria"):
     return CharacterRepository(db).create(
-        Character(display_name=name, character_name=name, region="US", server="Stormrage")
+        Character(display_name=name, character_name=name, region="US", server="Proudmoore")
     )
 
 
@@ -43,7 +43,7 @@ def _add_pulls(db, character, n, *, kill_last=False):
         ))
         repo.upsert_fight_participant(FightParticipant(
             fight_id=fight.id, actor_id=1, name=character.character_name,
-            server="Stormrage", character_id=character.id,
+            server="Proudmoore", character_id=character.id,
         ))
     return report
 

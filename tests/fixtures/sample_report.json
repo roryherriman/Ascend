@@ -13,14 +13,14 @@
   "guild": {
     "name": "Test Guild",
     "server": {
-      "name": "Stormrage"
+      "name": "Proudmoore"
     }
   },
   "masterData": {
     "actors": [
-      { "id": 1, "name": "Kysarra", "server": "Stormrage", "subType": "Priest" },
-      { "id": 2, "name": "Someraider", "server": "Stormrage", "subType": "Warrior" },
-      { "id": 3, "name": "Otherraider", "server": "Stormrage", "subType": "Mage" }
+      { "id": 1, "name": "Aeloria", "server": "Proudmoore", "subType": "Priest" },
+      { "id": 2, "name": "Someraider", "server": "Proudmoore", "subType": "Warrior" },
+      { "id": 3, "name": "Otherraider", "server": "Proudmoore", "subType": "Mage" }
     ]
   },
   "fights": [

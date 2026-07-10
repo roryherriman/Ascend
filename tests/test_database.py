@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 
 import pytest
 
@@ -49,10 +49,10 @@ def test_expected_tables_exist(db):
 def test_character_crud_roundtrip(db):
     repo = CharacterRepository(db)
     character = Character(
-        display_name="Kysarra",
-        character_name="Kysarra",
+        display_name="Aeloria",
+        character_name="Aeloria",
         region="US",
-        server="Stormrage",
+        server="Proudmoore",
         wcl_character_id=108832382,
         character_class="Mage",
     )
@@ -60,12 +60,12 @@ def test_character_crud_roundtrip(db):
     assert created.id is not None
 
     fetched = repo.get(created.id)
-    assert fetched.display_name == "Kysarra"
+    assert fetched.display_name == "Aeloria"
     assert fetched.enabled is True
 
-    fetched.display_name = "Kysarra (Renamed)"
+    fetched.display_name = "Aeloria (Renamed)"
     repo.update(fetched)
-    assert repo.get(created.id).display_name == "Kysarra (Renamed)"
+    assert repo.get(created.id).display_name == "Aeloria (Renamed)"
 
     repo.set_enabled(created.id, False)
     assert repo.get(created.id).enabled is False

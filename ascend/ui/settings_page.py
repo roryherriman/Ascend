@@ -162,7 +162,7 @@ class SettingsPage(QWidget):
         group = QGroupBox("Guild && Tier")
         form = QFormLayout(group)
         self.guild_name_edit = QLineEdit()
-        self.guild_name_edit.setPlaceholderText("e.g. Ascend Raiders")
+        self.guild_name_edit.setPlaceholderText("e.g. Example Guild Name")
         form.addRow("Guild Name:", self.guild_name_edit)
 
         self.current_tier_edit = QLineEdit()
@@ -171,7 +171,7 @@ class SettingsPage(QWidget):
 
         self.guild_rank_edit = QLineEdit()
         self.guild_rank_edit.setPlaceholderText("e.g. Officer, Raider, Rank 3")
-        form.addRow("Guild US Rank:", self.guild_rank_edit)
+        form.addRow("Guild Rank:", self.guild_rank_edit)
 
         icon_row = QWidget()
         icon_row_layout = _horizontal(

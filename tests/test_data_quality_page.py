@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository, SyncHistoryRepository
 from ascend.ui.data_quality_page import DataQualityPage
@@ -14,14 +14,14 @@ def test_confidence_table_reflects_detection_status(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:
         character = CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="ABC"))
         fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id
             )
         )
 
@@ -29,7 +29,7 @@ def test_confidence_table_reflects_detection_status(tmp_path, qtbot):
         qtbot.addWidget(page)
 
         assert page.confidence_table.rowCount() == 1
-        assert page.confidence_table.item(0, 0).text() == "Kysarra"
+        assert page.confidence_table.item(0, 0).text() == "Aeloria"
         assert page.confidence_table.item(0, 1).text() == "1"
     finally:
         db.close()

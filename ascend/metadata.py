@@ -11,7 +11,7 @@ APP_VERSION = "0.1.0"
 BUILD_NUMBER = "1"
 COPYRIGHT = "Copyright (c) 2026 Rory Herriman"
 
-GITHUB_REPO = "roryherriman/Ascende"
+GITHUB_REPO = "roryherriman/Ascend"
 GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
 WARCRAFT_LOGS_URL = "https://www.warcraftlogs.com"
 

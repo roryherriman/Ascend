@@ -1,4 +1,4 @@
-from ascend.analysis.categories import (
+﻿from ascend.analysis.categories import (
     compute_consistency_category,
     compute_damage_category,
     compute_execution_category,
@@ -19,7 +19,7 @@ def _make_db(tmp_path):
     return db
 
 
-def _make_character(db, name="Kysarra", server="Stormrage"):
+def _make_character(db, name="Aeloria", server="Proudmoore"):
     return CharacterRepository(db).create(
         Character(display_name=name, character_name=name, region="US", server=server)
     )
@@ -48,7 +48,7 @@ def test_participation_available_and_scored_correctly(tmp_path):
         fight1 = reports_repo.upsert_fight(Fight(report_id=report1.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight(Fight(report_id=report2.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
-            FightParticipant(fight_id=fight1.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+            FightParticipant(fight_id=fight1.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
         )
 
         category = compute_participation_category(db, character.id)
@@ -75,7 +75,7 @@ def test_participation_score_rises_with_more_data_at_same_rate(tmp_path):
             report = reports_repo.upsert_report(Report(report_code=f"N{i}"))
             fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
             reports_repo.upsert_fight_participant(
-                FightParticipant(fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+                FightParticipant(fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
             )
 
         category = compute_participation_category(db, character.id)
@@ -107,7 +107,7 @@ def test_learning_unavailable_with_too_few_pull_range_buckets(tmp_path):
             Fight(report_id=report.id, fight_id=1, name="Boss", encounter_id=1, kill=False)
         )
         reports_repo.upsert_fight_participant(
-            FightParticipant(fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+            FightParticipant(fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
         )
 
         category = compute_learning_category(db, character.id)
@@ -128,14 +128,14 @@ def test_learning_partial_with_improving_wipe_rate(tmp_path):
                 Fight(report_id=report.id, fight_id=i + 1, name="Boss", encounter_id=1, kill=False)
             )
             reports_repo.upsert_fight_participant(
-                FightParticipant(fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+                FightParticipant(fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
             )
         for i in range(10, 15):
             fight = reports_repo.upsert_fight(
                 Fight(report_id=report.id, fight_id=i + 1, name="Boss", encounter_id=1, kill=True)
             )
             reports_repo.upsert_fight_participant(
-                FightParticipant(fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+                FightParticipant(fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
             )
 
         category = compute_learning_category(db, character.id)

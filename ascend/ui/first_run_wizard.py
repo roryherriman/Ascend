@@ -148,21 +148,33 @@ class CharactersSetupPage(QWizardPage):
     def __init__(self, db: Database):
         super().__init__()
         self.db = db
-        self.setTitle("Confirm Your Characters")
+        self.setTitle("Add Your Characters")
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(
-            "Ascend comes with your Mage and Warlock pre-configured. "
-            "You can add more, or edit these, any time in the Characters page."
+            "Add the characters you play to get started. "
+            "Ascend uses character information to match you in imported Warcraft Logs reports.\n\n"
+            "You can add more characters or edit them any time from the Characters page."
         ))
-        from ascend.data.repositories import CharacterRepository
 
-        for character in CharacterRepository(db).list_all():
-            layout.addWidget(QLabel(f"  - {character.display_name} ({character.character_class})"))
+        self._char_list_layout = QVBoxLayout()
+        layout.addLayout(self._char_list_layout)
+        self._refresh_char_list(db)
 
-        add_button = QPushButton("Add Another Character")
+        add_button = QPushButton("Add a Character")
         add_button.clicked.connect(self._on_add)
         layout.addWidget(add_button)
+        layout.addStretch()
+
+    def _refresh_char_list(self, db) -> None:
+        from ascend.data.repositories import CharacterRepository
+        while self._char_list_layout.count():
+            item = self._char_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for character in CharacterRepository(db).list_all():
+            label = QLabel(f"  • {character.display_name} ({character.character_class or 'Unknown class'}) — {character.server or ''} [{character.region or ''}]")
+            self._char_list_layout.addWidget(label)
 
     def _on_add(self) -> None:
         from ascend.data.repositories import CharacterRepository
@@ -170,22 +182,31 @@ class CharactersSetupPage(QWizardPage):
         dialog = CharacterDialog(self)
         if dialog.exec():
             CharacterRepository(self.db).create(dialog.result_character())
+            self._refresh_char_list(self.db)
 
 
 class TierAndRankPage(QWizardPage):
     def __init__(self, settings_repo: SettingsRepository):
         super().__init__()
         self.settings_repo = settings_repo
-        self.setTitle("Raid Tier and Guild Rank")
+        self.setTitle("Raid Context")
 
         form = QFormLayout(self)
         self.tier_edit = QLineEdit(self.settings_repo.get("current_tier", ""))
         self.tier_edit.setPlaceholderText("e.g. Liberation of Undermine")
         form.addRow("Current Raid Tier:", self.tier_edit)
 
+        note = QLabel(
+            "API-backed raid tier selection with a searchable dropdown is coming in a future update. "
+            "For now, enter the name of the current tier you are progressing."
+        )
+        note.setProperty("class", "muted")
+        note.setWordWrap(True)
+        form.addRow("", note)
+
         self.rank_edit = QLineEdit(self.settings_repo.get("guild_us_rank", ""))
-        self.rank_edit.setPlaceholderText("e.g. Officer, Raider, Rank 3")
-        form.addRow("Guild US Rank:", self.rank_edit)
+        self.rank_edit.setPlaceholderText("e.g. 42")
+        form.addRow("Guild Rank:", self.rank_edit)
 
     def validatePage(self) -> bool:
         self.settings_repo.set("current_tier", self.tier_edit.text().strip())

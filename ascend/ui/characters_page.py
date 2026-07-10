@@ -27,39 +27,68 @@ COLUMNS = [
     "Class", "Role", "Enabled", "Notes",
 ]
 
-INITIAL_CHARACTERS: list[Character] = [
+# Fictional demo roster — used only in Demo Mode, never seeded into real user databases.
+# These characters are illustrative examples representing four roles so the UI can be
+# explored before a real Warcraft Logs report is imported.
+DEMO_CHARACTERS: list[Character] = [
     Character(
-        display_name="Kysarra",
-        character_name="Kysarra",
+        display_name="Aeloria",
+        character_name="Aeloria",
         region="US",
-        server="Stormrage",
-        wcl_character_id=108832382,
+        server="Proudmoore",
+        wcl_character_id=None,
         character_class="Mage",
         character_role="primary",
         enabled=True,
-        notes="",
+        notes="Demo character",
     ),
     Character(
-        display_name="Kyssandra",
-        character_name="Kyssandra",
+        display_name="Thornveil",
+        character_name="Thornveil",
         region="US",
-        server="Stormrage",
-        wcl_character_id=110023835,
+        server="Proudmoore",
+        wcl_character_id=None,
         character_class="Warlock",
         character_role="primary",
         enabled=True,
-        notes="",
+        notes="Demo character",
+    ),
+    Character(
+        display_name="Kaelric",
+        character_name="Kaelric",
+        region="US",
+        server="Proudmoore",
+        wcl_character_id=None,
+        character_class="Warrior",
+        character_role="primary",
+        enabled=True,
+        notes="Demo character",
+    ),
+    Character(
+        display_name="Seraphyne",
+        character_name="Seraphyne",
+        region="US",
+        server="Proudmoore",
+        wcl_character_id=None,
+        character_class="Priest",
+        character_role="primary",
+        enabled=True,
+        notes="Demo character",
     ),
 ]
 
 
 def seed_initial_characters(db: Database) -> None:
-    """Insert the starter roster into SQLite on first run only. Not hardcoded into logic
-    elsewhere - once seeded, all further changes go through the GUI and the database."""
+    """No-op for real users — they configure their own characters through the wizard or
+    Characters page. Kept for backwards compatibility with call sites."""
+
+
+def seed_demo_characters(db: Database) -> None:
+    """Seed fictional demo characters for Demo Mode. Only called in demo builds."""
     repo = CharacterRepository(db)
     if repo.list_all():
         return
-    for character in INITIAL_CHARACTERS:
+    for character in DEMO_CHARACTERS:
         repo.create(character)
 
 

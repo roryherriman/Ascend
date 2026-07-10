@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.services.death_data import fetch_and_cache_death_table, get_cached_death_table
 
 
@@ -25,7 +25,7 @@ def test_fetch_and_cache_stores_and_returns_payload(tmp_path):
     db = Database(tmp_path / "test.db")
     db.initialize()
     try:
-        payload = {"entries": [{"name": "Kysarra", "deathTime": 12345}]}
+        payload = {"entries": [{"name": "Aeloria", "deathTime": 12345}]}
         client = FakeClient(payload)
 
         result = fetch_and_cache_death_table(db, client, "ABC123", fight_ids=[1, 2])

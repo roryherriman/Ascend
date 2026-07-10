@@ -1,4 +1,4 @@
-import time
+﻿import time
 
 from PySide6.QtCore import QTimer
 
@@ -34,15 +34,13 @@ def test_navigation_switches_every_page_without_error(tmp_path, qtbot):
         db.close()
 
 
-def test_initial_characters_are_seeded_into_sqlite_not_hardcoded(tmp_path, qtbot):
+def test_real_user_starts_with_no_seeded_characters(tmp_path, qtbot):
     window, db = _make_window(tmp_path, qtbot)
     try:
         from ascend.data.repositories import CharacterRepository
 
         characters = CharacterRepository(db).list_all()
-        names = {c.character_name for c in characters}
-        assert "Kysarra" in names
-        assert "Kyssandra" in names
+        assert characters == [], "Real user flow should start with no pre-seeded characters"
     finally:
         db.close()
 

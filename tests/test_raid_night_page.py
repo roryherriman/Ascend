@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.ui.raid_night_page import PullDetailDialog, RaidNightSummaryPage
@@ -27,8 +27,8 @@ def test_shows_detail_with_pulls_and_roster_for_seeded_report(tmp_path, qtbot):
     try:
         character = CharacterRepository(db).create(
             Character(
-                display_name="Kysarra", character_name="Kysarra",
-                region="US", server="Stormrage", character_role="primary",
+                display_name="Aeloria", character_name="Aeloria",
+                region="US", server="Proudmoore", character_role="primary",
             )
         )
         reports_repo = ReportRepository(db)
@@ -43,13 +43,13 @@ def test_shows_detail_with_pulls_and_roster_for_seeded_report(tmp_path, qtbot):
         )
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage",
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore",
                 class_name="Priest", character_id=character.id,
             )
         )
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=2, name="Otherraider", server="Stormrage",
+                fight_id=fight.id, actor_id=2, name="Otherraider", server="Proudmoore",
                 class_name="Mage", character_id=None,
             )
         )
@@ -69,7 +69,7 @@ def test_shows_detail_with_pulls_and_roster_for_seeded_report(tmp_path, qtbot):
 
         assert page.roster_table.rowCount() == 2
         names = {page.roster_table.item(r, 0).text() for r in range(2)}
-        assert names == {"Kysarra", "Otherraider"}
+        assert names == {"Aeloria", "Otherraider"}
     finally:
         db.close()
 
@@ -145,7 +145,7 @@ def test_pull_detail_dialog_shows_fight_and_participants(tmp_path, qtbot):
         )
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", class_name="Priest",
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", class_name="Priest",
             )
         )
 
@@ -154,7 +154,7 @@ def test_pull_detail_dialog_shows_fight_and_participants(tmp_path, qtbot):
 
         assert "Test Boss" in dialog.windowTitle()
         assert dialog.participants_table.rowCount() == 1
-        assert dialog.participants_table.item(0, 0).text() == "Kysarra"
+        assert dialog.participants_table.item(0, 0).text() == "Aeloria"
         assert dialog.evidence_button.text() == "Open This Pull on Warcraft Logs"
     finally:
         db.close()

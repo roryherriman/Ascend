@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.ui.roster_page import RosterComparisonPage
@@ -26,7 +26,7 @@ def test_table_shows_attendance_and_tracked_badge(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:
         character = CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report1 = reports_repo.upsert_report(Report(report_code="NIGHT1"))
@@ -38,13 +38,13 @@ def test_table_shows_attendance_and_tracked_badge(tmp_path, qtbot):
         for fight in (fight1, fight2):
             reports_repo.upsert_fight_participant(
                 FightParticipant(
-                    fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage",
+                    fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore",
                     class_name="Priest", character_id=character.id,
                 )
             )
             reports_repo.upsert_fight_participant(
                 FightParticipant(
-                    fight_id=fight.id, actor_id=2, name="Otherraider", server="Stormrage",
+                    fight_id=fight.id, actor_id=2, name="Otherraider", server="Proudmoore",
                     class_name="Mage", character_id=None,
                 )
             )
@@ -55,7 +55,7 @@ def test_table_shows_attendance_and_tracked_badge(tmp_path, qtbot):
         assert not page.table.isHidden()
         assert page.table.rowCount() == 2
         names = {page.table.item(r, 0).text() for r in range(2)}
-        assert names == {"Kysarra", "Otherraider"}
+        assert names == {"Aeloria", "Otherraider"}
         # Both attended both raid nights.
         for row in range(2):
             assert page.table.item(row, 3).text() == "2"

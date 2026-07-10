@@ -1,4 +1,4 @@
-"""Tests for Encounter Progression, Trends, and Export pages.
+﻿"""Tests for Encounter Progression, Trends, and Export pages.
 
 These are integration tests: each builds a real in-memory database with
 representative data, instantiates the page widget, calls reload(), and
@@ -63,8 +63,8 @@ def _seed_roster(db: Database) -> None:
     repo = ReportRepository(db)
     r = repo.upsert_report(Report(report_code="RROST"))
     f = repo.upsert_fight(Fight(report_id=r.id, fight_id=1, name="Boss"))
-    repo.upsert_fight_participant(FightParticipant(fight_id=f.id, actor_id=1, name="Kysarra", server="Stormrage"))
-    repo.upsert_fight_participant(FightParticipant(fight_id=f.id, actor_id=2, name="Mookson", server="Stormrage"))
+    repo.upsert_fight_participant(FightParticipant(fight_id=f.id, actor_id=1, name="Aeloria", server="Proudmoore"))
+    repo.upsert_fight_participant(FightParticipant(fight_id=f.id, actor_id=2, name="Kaelric", server="Proudmoore"))
 
 
 # -- Encounter Progression ---------------------------------------------------
@@ -200,8 +200,8 @@ class TestExportData:
             _seed_roster(db)
             rows = _roster_attendance_rows(db)
             names = [r["Name"] for r in rows]
-            assert "Kysarra" in names
-            assert "Mookson" in names
+            assert "Aeloria" in names
+            assert "Kaelric" in names
         finally:
             db.close()
 

@@ -1,4 +1,4 @@
-"""Dashboard STATE-DRIVEN COMPOSITION: verifies the Dashboard shows a
+﻿"""Dashboard STATE-DRIVEN COMPOSITION: verifies the Dashboard shows a
 genuinely different widget/composition for NO_DATA, IMPORTED_INCOMPLETE, and
 ACTIVE - not the same layout with values swapped for "--" - and that state
 is recomputed after an import, after analysis completes, and on demand (e.g.
@@ -129,7 +129,7 @@ def test_participation_kpi_reflects_best_attended_tracked_character(tmp_path, qt
     db.initialize()
     try:
         character = CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report1 = reports_repo.upsert_report(Report(report_code="N1"))
@@ -137,7 +137,7 @@ def test_participation_kpi_reflects_best_attended_tracked_character(tmp_path, qt
         fight1 = reports_repo.upsert_fight(Fight(report_id=report1.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight(Fight(report_id=report2.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
-            FightParticipant(fight_id=fight1.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+            FightParticipant(fight_id=fight1.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
         )
 
         state = _make_active_state(db, qtbot)
@@ -168,18 +168,18 @@ def test_data_quality_banner_warns_about_undetected_character(tmp_path, qtbot):
     db.initialize()
     try:
         CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="N1"))
         fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
-            FightParticipant(fight_id=fight.id, actor_id=1, name="Someoneelse", server="Stormrage")
+            FightParticipant(fight_id=fight.id, actor_id=1, name="Someoneelse", server="Proudmoore")
         )
 
         state = _make_active_state(db, qtbot)
         assert not state.data_quality_banner.isHidden()
-        assert "Kysarra" in state.data_quality_banner.label.text()
+        assert "Aeloria" in state.data_quality_banner.label.text()
     finally:
         db.close()
 
@@ -189,14 +189,14 @@ def test_data_quality_banner_hidden_when_nothing_to_warn_about(tmp_path, qtbot):
     db.initialize()
     try:
         character = CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="N1"))
         for i in range(3):
             fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=i + 1, name="Boss"))
             reports_repo.upsert_fight_participant(
-                FightParticipant(fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage", character_id=character.id)
+                FightParticipant(fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id)
             )
 
         state = _make_active_state(db, qtbot)
@@ -212,7 +212,7 @@ def test_apply_demo_data_suppresses_data_quality_banner(tmp_path, qtbot):
         # A tracked character with zero participations would normally trip
         # the "not detected" warning - apply_demo_data must suppress it.
         CharacterRepository(db).create(
-            Character(display_name="Kysarra", character_name="Kysarra", region="US", server="Stormrage")
+            Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
         report = reports_repo.upsert_report(Report(report_code="N1"))

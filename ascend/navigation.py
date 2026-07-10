@@ -167,12 +167,6 @@ class Sidebar(QWidget):
         version_label.setProperty("class", "caption")
         top_row.addWidget(version_label)
 
-        phase_label = QLabel("PHASE 1")
-        phase_label.setProperty("class", "caption")
-        phase_label.setStyleSheet(
-            f"color: {DARK_TOKENS.palette.accent_hover}; font-weight: 700;"
-        )
-        top_row.addWidget(phase_label)
         top_row.addStretch()
         layout.addLayout(top_row)
 

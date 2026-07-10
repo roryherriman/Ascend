@@ -900,7 +900,7 @@ class ActiveAnalyticsState(QWidget):
             ("STRENGTH", "success", "Low First-Death Rate",
              "You were among the final 40% of players alive on 94% of progression pulls."),
             ("IMPROVE", "warning", "Movement Downtime",
-             "Your active time was 6.2% below the ranged roster median."),
+             "Your active time was 6.2% below your role cohort median."),
             ("TREND", "info", "Improving Consistency",
              "Pull-to-pull damage variance improved 14% over the last 3 raid nights."),
         ]
@@ -910,11 +910,11 @@ class ActiveAnalyticsState(QWidget):
             )
 
         demo_rows = [
-            ("Jul 12", "Ascend Raiders", "Kysarra", "Dimensius", "31", "84", "STRONG", "+3.2"),
-            ("Jul 09", "Ascend Raiders", "Kysarra", "Dimensius", "27", "81", "STRONG", "+1.8"),
-            ("Jul 05", "Ascend Raiders", "Kyssandra", "Dimensius", "24", "76", "ABOVE AVERAGE", "+4.1"),
-            ("Jul 02", "Ascend Raiders", "Kysarra", "Rasha'nan", "12", "79", "ABOVE AVERAGE", "--"),
-            ("Jun 28", "Ascend Raiders", "Kysarra", "Rasha'nan", "18", "72", "AVERAGE", "+2.5"),
+            ("Jul 12", "Stellar Ascent", "Aeloria", "Dimensius", "31", "84", "STRONG", "+3.2"),
+            ("Jul 09", "Stellar Ascent", "Aeloria", "Dimensius", "27", "81", "STRONG", "+1.8"),
+            ("Jul 05", "Stellar Ascent", "Thornveil", "Dimensius", "24", "76", "ABOVE AVERAGE", "+4.1"),
+            ("Jul 02", "Stellar Ascent", "Kaelric", "Rasha'nan", "12", "79", "ABOVE AVERAGE", "--"),
+            ("Jun 28", "Stellar Ascent", "Seraphyne", "Rasha'nan", "18", "72", "AVERAGE", "+2.5"),
         ]
         self.recent_table.setRowCount(len(demo_rows))
         for row_index, values in enumerate(demo_rows):
