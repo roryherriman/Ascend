@@ -33,7 +33,27 @@ def _seed_dev_env_credentials(settings_repo, secure_storage) -> None:
         secure_storage.set_discord_webhook(env_webhook)
 
 
+def _is_setup_complete(settings_repo, db) -> bool:
+    """Check explicit app_state table, falling back to legacy first_run_completed setting."""
+    row = db.query_one("SELECT setup_state FROM app_state WHERE id = 1")
+    if row is not None:
+        return row["setup_state"] == "completed"
+    return bool(settings_repo.get("first_run_completed", False))
+
+
+def _mark_setup_complete(db) -> None:
+    db.execute(
+        "INSERT INTO app_state (id, setup_state) VALUES (1, 'completed') "
+        "ON CONFLICT(id) DO UPDATE SET setup_state = 'completed'"
+    )
+
+
 def main() -> int:
+    if "--fresh-profile" in sys.argv[1:]:
+        import tempfile
+        _fresh_dir = tempfile.mkdtemp(prefix="AscendFresh_")
+        os.environ["LOCALAPPDATA"] = _fresh_dir
+
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     app = QApplication(sys.argv)
@@ -84,12 +104,25 @@ def main() -> int:
             seed_demo_characters(db)
             ensure_demo_report_seeded(db)
 
-        if not settings_repo.get("first_run_completed", False) and not is_demo:
+        if not _is_setup_complete(settings_repo, db) and not is_demo:
             wizard = FirstRunWizard(db, secure_storage, task_manager)
             wizard.exec()
             settings_repo.set("first_run_completed", True)
+            _mark_setup_complete(db)
 
         window = MainWindow(db, secure_storage=secure_storage, is_demo=is_demo)
+
+        def _on_restart_wizard():
+            wizard = FirstRunWizard(db, secure_storage, task_manager)
+            wizard.exec()
+            _mark_setup_complete(db)
+            settings_repo.set("first_run_completed", True)
+
+        settings_page = window.findChild(type(None).__class__, "SettingsPage")
+        from ascend.ui.settings_page import SettingsPage as _SettingsPage
+        for child in window.findChildren(_SettingsPage):
+            child.restart_wizard_requested.connect(_on_restart_wizard)
+
         window.show()
     except Exception as exc:  # noqa: BLE001 - top-level guard so the app never crashes silently
         tb = traceback.format_exc()

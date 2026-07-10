@@ -14,9 +14,11 @@ import requests
 from ascend.api.auth import OAuthClient, WCLAuthError, WCLNetworkError
 from ascend.api.graphql_queries import (
     DEATH_TABLE_QUERY,
+    GUILD_LOOKUP_QUERY,
     RATE_LIMIT_QUERY,
     REPORT_BY_CODE_QUERY,
     ZONE_DIFFICULTIES_QUERY,
+    ZONES_QUERY,
 )
 from ascend.logging_setup import get_logger
 
@@ -134,6 +136,60 @@ class WCLClient:
         world_data = data.get("worldData") or {}
         zone = world_data.get("zone") or {}
         return zone.get("difficulties") or []
+
+    def fetch_zones(self) -> list[dict[str, Any]]:
+        """Returns all raid zones from worldData.zones.
+
+        Each dict has: id, name, frozen, expansion_id, expansion_name.
+        Raises WCLNetworkError or WCLGraphQLError on failure.
+        """
+        data = self.execute(ZONES_QUERY)
+        world_data = data.get("worldData") or {}
+        raw_zones = world_data.get("zones") or []
+        result = []
+        for z in raw_zones:
+            expansion = z.get("expansion") or {}
+            result.append({
+                "id": z.get("id"),
+                "name": z.get("name", ""),
+                "frozen": bool(z.get("frozen", False)),
+                "expansion_id": expansion.get("id"),
+                "expansion_name": expansion.get("name", ""),
+            })
+        return result
+
+    def fetch_guild(
+        self, name: str, server_slug: str, server_region: str
+    ) -> dict[str, Any] | None:
+        """Look up a guild by name, realm slug, and region.
+
+        Returns a dict with id, name, server_name, server_slug, region_slug,
+        region_name, faction_id, faction_name — or None if not found.
+        """
+        try:
+            data = self.execute(
+                GUILD_LOOKUP_QUERY,
+                {"name": name, "serverSlug": server_slug, "serverRegion": server_region},
+            )
+        except WCLGraphQLError:
+            return None
+        guild_data = data.get("guildData") or {}
+        guild = guild_data.get("guild")
+        if not guild:
+            return None
+        server = guild.get("server") or {}
+        region = server.get("region") or {}
+        faction = guild.get("faction") or {}
+        return {
+            "id": guild.get("id"),
+            "name": guild.get("name", ""),
+            "server_name": server.get("name", ""),
+            "server_slug": server.get("slug", ""),
+            "region_slug": region.get("slug", ""),
+            "region_name": region.get("name", ""),
+            "faction_id": faction.get("id"),
+            "faction_name": faction.get("name", ""),
+        }
 
     def fetch_death_table(self, report_code: str, fight_ids: list[int] | None = None) -> Any:
         """Returns Report.table(dataType: Deaths) for the given fights - an

@@ -30,6 +30,45 @@ payload as opaque/best-effort rather than asserting a field-level contract
 it can't verify - see ascend/services/death_data.py.
 """
 
+ZONES_QUERY = """
+query Zones {
+  worldData {
+    zones {
+      id
+      name
+      frozen
+      expansion {
+        id
+        name
+      }
+    }
+  }
+}
+"""
+
+GUILD_LOOKUP_QUERY = """
+query GuildLookup($name: String!, $serverSlug: String!, $serverRegion: String!) {
+  guildData {
+    guild(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
+      id
+      name
+      server {
+        name
+        slug
+        region {
+          slug
+          name
+        }
+      }
+      faction {
+        id
+        name
+      }
+    }
+  }
+}
+"""
+
 ZONE_DIFFICULTIES_QUERY = """
 query ZoneDifficulties($zoneId: Int!) {
   worldData {

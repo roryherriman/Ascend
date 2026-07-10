@@ -182,6 +182,27 @@ MIGRATIONS: list[Migration] = [
             CHECK (spec_role IN ('tank', 'healer', 'ranged', 'melee') OR spec_role IS NULL);
         """,
     ),
+    Migration(
+        version=7,
+        description="First-release fixes: app_state for setup lifecycle, guild verification columns",
+        sql="""
+        CREATE TABLE IF NOT EXISTS app_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            setup_state TEXT NOT NULL DEFAULT 'not_started'
+                CHECK (setup_state IN ('not_started', 'in_progress', 'completed', 'reset_required')),
+            setup_completed_at TEXT,
+            setup_version INTEGER NOT NULL DEFAULT 1,
+            last_reset_at TEXT
+        );
+
+        INSERT OR IGNORE INTO app_state (id, setup_state)
+            SELECT 1,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM settings
+                    WHERE key = 'first_run_completed' AND value = 'true'
+                ) THEN 'completed' ELSE 'not_started' END;
+        """,
+    ),
 ]
 
 
