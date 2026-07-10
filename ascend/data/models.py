@@ -55,6 +55,22 @@ class Fight:
 
 
 @dataclass
+class FightParticipant:
+    """One player actor present in a fight (from ReportMasterData.actors,
+    matched against Fight.friendlyPlayers). ``character_id`` is set when the
+    actor's name+server matches one of the user's tracked Characters - see
+    ascend/services/character_detection.py."""
+
+    fight_id: int
+    actor_id: int
+    name: str | None = None
+    server: str | None = None
+    class_name: str | None = None
+    character_id: int | None = None
+    id: int | None = None
+
+
+@dataclass
 class SyncHistoryEntry:
     operation_type: str
     status: str

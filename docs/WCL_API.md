@@ -28,8 +28,17 @@ rate-limit status.
 
 **`REPORT_BY_CODE_QUERY`** - `Query.reportData.report(code: String)` returning
 `code, title, startTime, endTime, zone { id name }, owner { name },
-guild { name, server { name } }, fights { id, name, encounterID, difficulty,
-kill, startTime, endTime, friendlyPlayers }`.
+guild { name, server { name } }, masterData { actors(type: "Player") { id
+name server subType } }, fights { id, name, encounterID, difficulty, kill,
+startTime, endTime, friendlyPlayers }`.
+
+`masterData.actors` (verified against `reportmasterdata.doc.html` /
+`reportactor.doc.html`) is used for character detection: `fights[].
+friendlyPlayers` gives per-fight actor **ids**, and `masterData.actors`
+resolves those ids to `name`/`server`/`subType` (class). `ReportActor` has
+no region field, so matching a participant to a tracked `Character` is
+name+server only - see `ascend/services/character_detection.py` for the
+documented limitation this implies.
 
 ## Error handling (`ascend/api/client.py`)
 

@@ -1,9 +1,12 @@
-"""Phase 1 sync operations: report-code entry and basic report retrieval.
+"""Sync operations: report-code entry, report/fight retrieval, and
+character detection.
 
-Bulk report discovery and full pull/event ingestion are added in Phase 2/3.
+Bulk report discovery and full pull/event ingestion are added in Phase 3.
 For now this supports fetching one report by its code and storing its
-top-level metadata plus its list of fights (pulls), without ever creating
-duplicate report or fight rows on repeated syncs.
+top-level metadata, its list of fights (pulls), and the player actors
+present in each fight (matched against tracked Characters where possible),
+without ever creating duplicate report/fight/participant rows on repeated
+syncs.
 """
 from __future__ import annotations
 
@@ -12,9 +15,15 @@ from typing import Callable
 
 from ascend.api.client import WCLClient
 from ascend.data.database import Database
-from ascend.data.models import Fight, Report
-from ascend.data.repositories import ApiCacheRepository, ReportRepository, SyncHistoryRepository
+from ascend.data.models import Fight, FightParticipant, Report
+from ascend.data.repositories import (
+    ApiCacheRepository,
+    CharacterRepository,
+    ReportRepository,
+    SyncHistoryRepository,
+)
 from ascend.services.background_worker import CancellationToken
+from ascend.services.character_detection import match_character
 
 
 class ReportCodeNotFoundError(Exception):
@@ -71,6 +80,12 @@ def sync_report_by_code(
         )
         report = reports_repo.upsert_report(report)
 
+        master_data = raw.get("masterData") or {}
+        actors_by_id = {
+            actor["id"]: actor for actor in (master_data.get("actors") or []) if actor.get("id") is not None
+        }
+        tracked_characters = CharacterRepository(db).list_all(enabled_only=True)
+
         fights_raw = raw.get("fights") or []
         for i, fight_raw in enumerate(fights_raw):
             if cancel_token.is_cancelled:
@@ -88,7 +103,24 @@ def sync_report_by_code(
                 start_time=fight_raw.get("startTime"),
                 end_time=fight_raw.get("endTime"),
             )
-            reports_repo.upsert_fight(fight)
+            fight = reports_repo.upsert_fight(fight)
+
+            for actor_id in fight_raw.get("friendlyPlayers") or []:
+                actor = actors_by_id.get(actor_id)
+                if actor is None:
+                    continue
+                matched = match_character(actor.get("name"), actor.get("server"), tracked_characters)
+                reports_repo.upsert_fight_participant(
+                    FightParticipant(
+                        fight_id=fight.id,
+                        actor_id=actor_id,
+                        name=actor.get("name"),
+                        server=actor.get("server"),
+                        class_name=actor.get("subType"),
+                        character_id=matched.id if matched else None,
+                    )
+                )
+
             pct = 50 + int(40 * (i + 1) / max(len(fights_raw), 1))
             progress_callback(pct, f"Stored pull {i + 1}/{len(fights_raw)}...")
 
