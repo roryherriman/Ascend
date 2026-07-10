@@ -9,6 +9,20 @@ Ascend is a free Windows desktop app for competitive World of Warcraft raiders. 
 
 ---
 
+## Download and install
+
+Download the latest **Ascend-Setup-x.x.x.exe** from the [Releases page](https://github.com/roryherriman/Ascende/releases).
+
+Run the installer — no Python, no terminal, no source code required. Ascend installs to Program Files and creates a Start Menu shortcut. Your data is stored separately in `%LOCALAPPDATA%\Ascend\` and is never deleted when you upgrade or uninstall.
+
+**Windows 10 and 11 (64-bit) are supported.**
+
+> **Note:** Windows SmartScreen may warn that Ascend is from an unknown publisher. This is expected for an unsigned community tool. Click "More info → Run anyway" to proceed. Code signing is planned for a future release.
+
+If you prefer not to use the installer, a **portable ZIP** (`Ascend-Portable-x.x.x.zip`) is also available — unzip anywhere and run `Ascend.exe`. No installation required.
+
+---
+
 ## What Ascend does
 
 ### Tracks your full progression arc
@@ -41,7 +55,7 @@ If Ascend doesn't have enough data to score a category reliably — too few pull
 
 ### Exports your data
 
-Save your encounter progression summary and roster attendance as CSV or a styled HTML report you can open in any browser. No formatting, no spreadsheet gymnastics — just the data.
+Save your encounter progression summary and roster attendance as CSV or a styled HTML report you can open in any browser.
 
 ---
 
@@ -58,15 +72,12 @@ Parse color tells you how you compare to everyone who's ever done the fight. Asc
 
 ---
 
-## Getting started
+## First-time setup
 
-1. Install **Python 3.11+** (check "Add python.exe to PATH" during install).
-2. Double-click **`setup.bat`** — sets up the environment and installs everything automatically.
-3. Double-click **`run_app.bat`** to launch Ascend.
-4. On first launch, enter your Warcraft Logs API credentials and add your character. You can get free API credentials at [warcraftlogs.com](https://www.warcraftlogs.com/api/clients/).
-5. Paste any Warcraft Logs report URL into Ascend and click **Analyze** to import it.
-
-No command line needed after setup.
+1. Install Ascend using the installer from the [Releases page](https://github.com/roryherriman/Ascende/releases).
+2. Launch Ascend from the Start Menu.
+3. The setup wizard will ask for your Warcraft Logs API credentials (see below).
+4. Add your character, paste a Warcraft Logs report URL, and click **Analyze**.
 
 ### Getting Warcraft Logs API credentials
 
@@ -82,9 +93,13 @@ Your credentials stay on your computer — they are never sent anywhere except d
 
 ## Your data stays on your computer
 
-Ascend is local-first. Your raid analysis, character history, encounter data, and settings are stored in a SQLite database on your own machine. Nothing is uploaded to any server. The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
+Ascend is local-first. Your raid analysis, character history, encounter data, and settings are stored in a SQLite database on your own machine at `%LOCALAPPDATA%\Ascend\`. Nothing is uploaded to any server. The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
 
 Your Warcraft Logs client secret is stored in the Windows Credential Manager — the same system your browser uses for saved passwords. It is never written to a plain text file or database.
+
+### Backup and restore
+
+Use **File → Back Up Ascend Data** to save a timestamped copy of your database. Use **File → Restore Ascend Data** to replace your current database with a backup. Use **File → Open Data Folder** to browse your data directory directly.
 
 ---
 
@@ -101,6 +116,23 @@ Your Warcraft Logs client secret is stored in the Windows Credential Manager —
 - **Data Quality** — flags characters not yet matched, reports with gaps, and small sample sizes
 - **Insights** — full score breakdown with category-by-category evidence
 - **Export** — save encounter and roster data as CSV or HTML
+
+---
+
+## Running from source (developers)
+
+If you want to run from the Python source instead of the installer:
+
+1. Install **Python 3.11** (64-bit).
+2. Double-click **`setup.bat`** to create the virtual environment and install dependencies.
+3. Double-click **`run_app.bat`** to launch Ascend.
+
+To build the Windows installer yourself:
+
+```
+scripts\build_portable.bat    # runs tests, builds dist\Ascend\
+scripts\build_installer.bat   # requires Inno Setup 6 installed
+```
 
 ---
 

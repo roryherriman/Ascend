@@ -239,12 +239,12 @@ class PlaceholderPage(QWidget):
 
     @staticmethod
     def _open_roadmap() -> None:
-        from pathlib import Path
-
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
 
-        roadmap_path = Path(__file__).resolve().parent.parent.parent / "docs" / "ROADMAP.md"
+        from ascend.resources import resource_path
+
+        roadmap_path = resource_path("docs", "ROADMAP.md")
         if roadmap_path.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(roadmap_path)))
 

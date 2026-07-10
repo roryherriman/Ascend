@@ -92,18 +92,43 @@ def main() -> int:
         window = MainWindow(db, secure_storage=secure_storage, is_demo=is_demo)
         window.show()
     except Exception as exc:  # noqa: BLE001 - top-level guard so the app never crashes silently
+        tb = traceback.format_exc()
         traceback.print_exc()
         try:
             get_logger().exception("Fatal startup error: %s", type(exc).__name__)
         except Exception:  # noqa: BLE001 - logging must never mask the real startup error
             pass
-        QMessageBox.critical(
-            None,
-            "Ascend - Startup Error",
-            "The application failed to start.\n\n"
+        # Write a crash log even when logging hasn't been configured yet
+        try:
+            from ascend.data.database import default_app_data_root
+            crash_dir = default_app_data_root() / "logs"
+            crash_dir.mkdir(parents=True, exist_ok=True)
+            import datetime as _dt
+            stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
+            (crash_dir / f"crash_{stamp}.txt").write_text(
+                f"Ascend startup crash\n{'=' * 40}\n{tb}", encoding="utf-8"
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        from PySide6.QtWidgets import QPushButton
+        msg = QMessageBox(
+            QMessageBox.Icon.Critical,
+            "Ascend — Startup Error",
+            "Ascend failed to start.\n\n"
             f"{type(exc).__name__}: {exc}\n\n"
-            "See the console log for full details.",
+            "A crash log has been written to your Ascend data folder.",
+            QMessageBox.StandardButton.Ok,
         )
+        open_logs = msg.addButton("Open Logs Folder", QMessageBox.ButtonRole.ActionRole)
+        msg.exec()
+        if msg.clickedButton() is open_logs:
+            try:
+                from ascend.data.database import default_app_data_root
+                from PySide6.QtCore import QUrl
+                from PySide6.QtGui import QDesktopServices
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(default_app_data_root() / "logs")))
+            except Exception:  # noqa: BLE001
+                pass
         return 1
 
     return app.exec()
