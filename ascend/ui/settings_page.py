@@ -113,6 +113,7 @@ class SettingsPage(QWidget):
         content = QWidget()
         form_layout = QVBoxLayout(content)
 
+        form_layout.addWidget(self._build_profile_group())
         form_layout.addWidget(self._build_credentials_group())
         form_layout.addWidget(self._build_guild_group())
         form_layout.addWidget(self._build_scoring_weights_group())
@@ -140,6 +141,17 @@ class SettingsPage(QWidget):
         self._load_values()
 
     # -- groups ---------------------------------------------------------
+
+    def _build_profile_group(self) -> QGroupBox:
+        group = QGroupBox("Player Profile")
+        form = QFormLayout(group)
+        self.player_display_name_edit = QLineEdit()
+        self.player_display_name_edit.setPlaceholderText("e.g. your in-game name or guild nickname")
+        form.addRow("Your name:", self.player_display_name_edit)
+        self.preferred_region_combo = QComboBox()
+        self.preferred_region_combo.addItems(["US", "EU", "KR", "TW", "CN"])
+        form.addRow("Preferred region:", self.preferred_region_combo)
+        return group
 
     def _build_credentials_group(self) -> QGroupBox:
         group = QGroupBox("Warcraft Logs Credentials")
@@ -339,6 +351,10 @@ class SettingsPage(QWidget):
     # -- load / save ------------------------------------------------------
 
     def _load_values(self) -> None:
+        self.player_display_name_edit.setText(self.settings_repo.get("player_display_name", ""))
+        preferred_region = self.settings_repo.get("preferred_region", "US")
+        if preferred_region in ["US", "EU", "KR", "TW", "CN"]:
+            self.preferred_region_combo.setCurrentText(preferred_region)
         self.client_id_edit.setText(self.settings_repo.get("wcl_client_id", ""))
         self.client_secret_edit.setText(self.secure_storage.get_client_secret() or "")
         self.guild_name_edit.setText(self.settings_repo.get("guild_name", ""))
@@ -391,6 +407,8 @@ class SettingsPage(QWidget):
             self.security_banner.setStyleSheet("color: #e0a83e; font-weight: 600;")
 
     def _on_save(self) -> None:
+        self.settings_repo.set("player_display_name", self.player_display_name_edit.text().strip())
+        self.settings_repo.set("preferred_region", self.preferred_region_combo.currentText())
         self.settings_repo.set("wcl_client_id", self.client_id_edit.text().strip())
         self.secure_storage.set_client_secret(self.client_secret_edit.text().strip() or None)
         self.settings_repo.set("guild_name", self.guild_name_edit.text().strip())

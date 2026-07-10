@@ -27,7 +27,7 @@ def test_first_run_wizard_has_all_setup_steps(tmp_path, qtbot):
         wizard = FirstRunWizard(db, secure_storage, task_manager)
         qtbot.addWidget(wizard)
 
-        assert len(wizard.pageIds()) == 10
+        assert len(wizard.pageIds()) == 11
     finally:
         db.close()
 
@@ -42,7 +42,8 @@ def test_first_run_wizard_credentials_page_saves_on_next(tmp_path, qtbot):
         qtbot.addWidget(wizard)
         wizard.show()
 
-        wizard.next()  # Welcome -> LocalFirst
+        wizard.next()  # Welcome -> PlayerProfile
+        wizard.next()  # PlayerProfile -> LocalFirst
         wizard.next()  # LocalFirst -> Credentials
         credentials_page = wizard.currentPage()
         credentials_page.client_id_edit.setText("wizard-client-id")
