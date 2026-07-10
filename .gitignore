@@ -1,0 +1,40 @@
+# Python / virtual environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+
+# Local data, secrets, and user-generated content - never commit
+.env
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+ascend.db
+ascend_demo.db
+secure_fallback.dat
+secure_fallback.bin
+credential_warning.flag
+data/
+!ascend/data/
+exports/
+logs/
+demo_data/
+*.log
+*.dmp
+
+# Local-only configuration / IDE settings
+.vscode/
+.idea/
+*.user
+
+# Claude Code session artifacts (local tooling, not project code)
+.claude/
