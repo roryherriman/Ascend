@@ -133,3 +133,20 @@ def test_rate_limit_response_raises_wclratelimiterror():
 
     with pytest.raises(WCLRateLimitError):
         client.execute("query { rateLimitData { limitPerHour } }")
+
+
+def test_fetch_death_table_extracts_table_json_payload():
+    payload = {"data": {"reportData": {"report": {"table": {"entries": [{"name": "Kysarra"}]}}}}}
+    session = FakeHTTPSession(FakeHTTPResponse(200, payload))
+    client = WCLClient("id", "secret", session=session, oauth_client=StubOAuth())
+
+    result = client.fetch_death_table("ABC123", fight_ids=[1, 2])
+    assert result == {"entries": [{"name": "Kysarra"}]}
+
+
+def test_fetch_death_table_returns_none_when_table_missing():
+    payload = {"data": {"reportData": {"report": {}}}}
+    session = FakeHTTPSession(FakeHTTPResponse(200, payload))
+    client = WCLClient("id", "secret", session=session, oauth_client=StubOAuth())
+
+    assert client.fetch_death_table("ABC123") is None
