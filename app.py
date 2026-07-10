@@ -79,9 +79,9 @@ def main() -> int:
         _seed_dev_env_credentials(settings_repo, secure_storage)
 
         if is_demo:
-            from ascend.ui.characters_page import seed_initial_characters
+            from ascend.ui.characters_page import seed_demo_characters
 
-            seed_initial_characters(db)
+            seed_demo_characters(db)
             ensure_demo_report_seeded(db)
 
         if not settings_repo.get("first_run_completed", False) and not is_demo:

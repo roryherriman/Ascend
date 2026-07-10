@@ -1,4 +1,4 @@
-from ascend.data.database import Database
+﻿from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.data.secure_storage import SecureStorage
@@ -23,8 +23,8 @@ def test_table_shows_detected_character_and_class(tmp_path, qtbot):
     try:
         character = CharacterRepository(db).create(
             Character(
-                display_name="Kysarra", character_name="Kysarra",
-                region="US", server="Stormrage", character_role="primary",
+                display_name="Aeloria", character_name="Aeloria",
+                region="US", server="Proudmoore", character_role="primary",
             )
         )
         reports_repo = ReportRepository(db)
@@ -34,7 +34,7 @@ def test_table_shows_detected_character_and_class(tmp_path, qtbot):
         )
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Kysarra", server="Stormrage",
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore",
                 class_name="Priest", character_id=character.id,
             )
         )
@@ -44,7 +44,7 @@ def test_table_shows_detected_character_and_class(tmp_path, qtbot):
 
         character_col = COLUMNS.index("Character")
         class_col = COLUMNS.index("Class")
-        assert page.table.item(0, character_col).text() == "Kysarra"
+        assert page.table.item(0, character_col).text() == "Aeloria"
         assert page.table.item(0, class_col).text() == "Priest"
     finally:
         db.close()

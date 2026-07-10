@@ -1,4 +1,4 @@
-import json
+﻿import json
 
 from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository
@@ -35,7 +35,7 @@ def test_shows_cached_death_data_for_selected_report(tmp_path, qtbot):
 
         class FakeClient:
             def fetch_death_table(self, report_code, fight_ids=None):
-                return {"entries": [{"name": "Kysarra"}]}
+                return {"entries": [{"name": "Aeloria"}]}
 
         fetch_and_cache_death_table(db, FakeClient(), "ABC123")
 
@@ -44,7 +44,7 @@ def test_shows_cached_death_data_for_selected_report(tmp_path, qtbot):
 
         assert not page.detail_container.isHidden()
         shown = json.loads(page.raw_data_view.toPlainText())
-        assert shown == {"entries": [{"name": "Kysarra"}]}
+        assert shown == {"entries": [{"name": "Aeloria"}]}
     finally:
         db.close()
 

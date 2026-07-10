@@ -26,10 +26,8 @@ from ascend.ui.roster_page import RosterComparisonPage
 from ascend.ui.settings_page import SettingsPage
 from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
-# key -> (development phase, note, planned capabilities, icon name)
 PLACEHOLDER_META: dict[str, dict] = {
     "raid_night_comparison": dict(
-        phase=3,
         note="Raid Night Comparison will let you compare two or more nights side by side.",
         planned=[
             "Compare 2+ raid nights at once",
@@ -39,17 +37,14 @@ PLACEHOLDER_META: dict[str, dict] = {
         icon="raid_night_comparison",
     ),
     "readiness": dict(
-        phase=3,
         note="Readiness will evaluate whether your data supports moving to a more competitive environment.",
         planned=[
             "Readiness classification with evidence",
-            "Guild-rank history",
             "Largest performance gaps, not just a score",
         ],
         icon="readiness",
     ),
     "goals": dict(
-        phase=3,
         note="Goals will let you set measurable targets that update automatically as you analyze reports.",
         planned=[
             "Measurable goals with start/target/current value",
@@ -59,7 +54,6 @@ PLACEHOLDER_META: dict[str, dict] = {
         icon="goals",
     ),
     "rules": dict(
-        phase=4,
         note="The Encounter Rules editor will let you configure mechanic rules without touching YAML by hand.",
         planned=[
             "Priority targets and avoidable-damage rules",
@@ -69,7 +63,6 @@ PLACEHOLDER_META: dict[str, dict] = {
         icon="rules",
     ),
     "export": dict(
-        phase=4,
         note="Discord Export will let you share a Raid Night Summary to your guild's Discord.",
         planned=[
             "Discord weekly summary",
@@ -208,7 +201,7 @@ class MainWindow(QMainWindow):
                 page = PlaceholderPage(
                     FULL_TITLES.get(key, self._nav_labels[key]),
                     meta.get("note", "Coming in a later phase."),
-                    phase=meta.get("phase"),
+                    phase=None,
                     planned=meta.get("planned"),
                     icon_name=meta.get("icon"),
                 )

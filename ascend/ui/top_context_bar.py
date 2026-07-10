@@ -160,4 +160,4 @@ class TopContextBar(QWidget):
         pixmap = get_guild_badge_pixmap(self.db, region, realm, guild_name, size=20)
         self.guild_icon_label.setPixmap(pixmap)
         self.guild_name_label.setText(guild_name or "No guild set")
-        self.guild_rank_label.setText(f"US Rank {guild_rank}" if guild_rank else "Set in Settings")
+        self.guild_rank_label.setText(f"Rank {guild_rank}" if guild_rank else "Set in Settings")

@@ -1,4 +1,4 @@
-"""Tests for ascend/services/fixture_sanitizer.py.
+﻿"""Tests for ascend/services/fixture_sanitizer.py.
 
 Verifies that the sanitizer replaces the right fields, preserves structural
 keys, and that the load/export round-trip works correctly.
@@ -23,8 +23,8 @@ _SAMPLE_PAYLOAD = {
             "endTime": 1700007200000,
             "masterData": {
                 "actors": [
-                    {"id": 1, "name": "Kysarra", "displayName": "Kysarra", "server": "Stormrage"},
-                    {"id": 2, "name": "Mookson", "displayName": "Mookson", "server": "Stormrage"},
+                    {"id": 1, "name": "Aeloria", "displayName": "Aeloria", "server": "Proudmoore"},
+                    {"id": 2, "name": "Kaelric", "displayName": "Kaelric", "server": "Proudmoore"},
                 ],
             },
             "events": {
@@ -79,7 +79,7 @@ def test_player_names_replaced_with_placeholders():
 def test_consistent_name_replacement_within_one_export():
     """The same name must map to the same placeholder throughout the fixture."""
     payload = {
-        "actors": [{"name": "Kysarra"}, {"name": "Kysarra"}],
+        "actors": [{"name": "Aeloria"}, {"name": "Aeloria"}],
     }
     result = sanitize_fixture(payload)
     assert result["payload"]["actors"][0]["name"] == result["payload"]["actors"][1]["name"]
@@ -87,7 +87,7 @@ def test_consistent_name_replacement_within_one_export():
 
 def test_different_names_get_different_placeholders():
     payload = {
-        "actors": [{"name": "Kysarra"}, {"name": "Mookson"}],
+        "actors": [{"name": "Aeloria"}, {"name": "Kaelric"}],
     }
     result = sanitize_fixture(payload)
     names = [a["name"] for a in result["payload"]["actors"]]

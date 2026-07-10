@@ -1,4 +1,4 @@
-import json
+﻿import json
 from pathlib import Path
 
 import pytest
@@ -136,12 +136,12 @@ def test_rate_limit_response_raises_wclratelimiterror():
 
 
 def test_fetch_death_table_extracts_table_json_payload():
-    payload = {"data": {"reportData": {"report": {"table": {"entries": [{"name": "Kysarra"}]}}}}}
+    payload = {"data": {"reportData": {"report": {"table": {"entries": [{"name": "Aeloria"}]}}}}}
     session = FakeHTTPSession(FakeHTTPResponse(200, payload))
     client = WCLClient("id", "secret", session=session, oauth_client=StubOAuth())
 
     result = client.fetch_death_table("ABC123", fight_ids=[1, 2])
-    assert result == {"entries": [{"name": "Kysarra"}]}
+    assert result == {"entries": [{"name": "Aeloria"}]}
 
 
 def test_fetch_death_table_returns_none_when_table_missing():
