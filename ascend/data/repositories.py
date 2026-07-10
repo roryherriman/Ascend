@@ -457,3 +457,55 @@ class ApiCacheRepository:
 
     def delete(self, cache_key: str) -> None:
         self.db.execute("DELETE FROM api_cache WHERE cache_key = ?", (cache_key,))
+
+
+class GuildIconRepository:
+    """Tracks where each guild's icon came from (generated fallback, a
+    user-chosen local image, or - in the future - an official API), so
+    Ascend never redownloads/regenerates on every launch and the user can
+    refresh, clear, or replace it. See docs/ASSET_LICENSES.md."""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def get(self, cache_key: str) -> dict | None:
+        row = self.db.query_one("SELECT * FROM guild_icons WHERE cache_key = ?", (cache_key,))
+        return dict(row) if row is not None else None
+
+    def upsert(
+        self,
+        cache_key: str,
+        region: str | None,
+        realm: str | None,
+        guild_name: str | None,
+        guild_id: int | None,
+        source_url: str | None,
+        source_type: str,
+        cache_file_path: str | None,
+        retrieval_status: str = "ok",
+    ) -> None:
+        self.db.execute(
+            """
+            INSERT INTO guild_icons
+                (cache_key, region, realm, guild_name, guild_id, source_url,
+                 source_type, cache_file_path, retrieval_status, last_retrieved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(cache_key) DO UPDATE SET
+                region = excluded.region,
+                realm = excluded.realm,
+                guild_name = excluded.guild_name,
+                guild_id = excluded.guild_id,
+                source_url = excluded.source_url,
+                source_type = excluded.source_type,
+                cache_file_path = excluded.cache_file_path,
+                retrieval_status = excluded.retrieval_status,
+                last_retrieved_at = excluded.last_retrieved_at
+            """,
+            (
+                cache_key, region, realm, guild_name, guild_id, source_url,
+                source_type, cache_file_path, retrieval_status, _now_iso(),
+            ),
+        )
+
+    def delete(self, cache_key: str) -> None:
+        self.db.execute("DELETE FROM guild_icons WHERE cache_key = ?", (cache_key,))

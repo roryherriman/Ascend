@@ -29,9 +29,15 @@ from ascend.data.database import (
     load_bootstrap_config,
     save_bootstrap_config,
 )
-from ascend.data.repositories import SettingsRepository
+from ascend.data.repositories import CharacterRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
+from ascend.services.guild_icon_service import (
+    clear_guild_icon,
+    get_or_create_guild_icon,
+    reset_to_automatic_guild_icon,
+    set_custom_guild_icon,
+)
 from ascend.ui.dialogs import show_error, show_info
 from ascend.ui.widgets import BackgroundTaskPanel
 
@@ -155,6 +161,10 @@ class SettingsPage(QWidget):
     def _build_guild_group(self) -> QGroupBox:
         group = QGroupBox("Guild && Tier")
         form = QFormLayout(group)
+        self.guild_name_edit = QLineEdit()
+        self.guild_name_edit.setPlaceholderText("e.g. Ascend Raiders")
+        form.addRow("Guild Name:", self.guild_name_edit)
+
         self.current_tier_edit = QLineEdit()
         self.current_tier_edit.setPlaceholderText("e.g. Liberation of Undermine")
         form.addRow("Current Raid Tier:", self.current_tier_edit)
@@ -162,6 +172,24 @@ class SettingsPage(QWidget):
         self.guild_rank_edit = QLineEdit()
         self.guild_rank_edit.setPlaceholderText("e.g. Officer, Raider, Rank 3")
         form.addRow("Guild US Rank:", self.guild_rank_edit)
+
+        icon_row = QWidget()
+        icon_row_layout = _horizontal(
+            self._build_button("Refresh Guild Icon", self._on_refresh_guild_icon),
+            self._build_button("Choose Custom Image...", self._on_choose_custom_guild_icon),
+            self._build_button("Clear Cached Icon", self._on_clear_guild_icon),
+            self._build_button("Reset to Automatic", self._on_reset_guild_icon),
+        )
+        icon_row.setLayout(icon_row_layout)
+        form.addRow("Guild Icon:", icon_row)
+
+        note = QLabel(
+            "Warcraft Logs does not expose a guild emblem, so Ascend generates a badge "
+            "from the guild name unless you choose a custom local image (never uploaded)."
+        )
+        note.setProperty("class", "muted")
+        note.setWordWrap(True)
+        form.addRow("", note)
 
         self.progression_weight_spin = QDoubleSpinBox()
         self.progression_weight_spin.setRange(0.0, 10.0)
@@ -313,6 +341,7 @@ class SettingsPage(QWidget):
     def _load_values(self) -> None:
         self.client_id_edit.setText(self.settings_repo.get("wcl_client_id", ""))
         self.client_secret_edit.setText(self.secure_storage.get_client_secret() or "")
+        self.guild_name_edit.setText(self.settings_repo.get("guild_name", ""))
         self.current_tier_edit.setText(self.settings_repo.get("current_tier", ""))
         self.guild_rank_edit.setText(self.settings_repo.get("guild_us_rank", ""))
         self.progression_weight_spin.setValue(self.settings_repo.get("progression_weight_multiplier", 1.0))
@@ -364,6 +393,7 @@ class SettingsPage(QWidget):
     def _on_save(self) -> None:
         self.settings_repo.set("wcl_client_id", self.client_id_edit.text().strip())
         self.secure_storage.set_client_secret(self.client_secret_edit.text().strip() or None)
+        self.settings_repo.set("guild_name", self.guild_name_edit.text().strip())
         self.settings_repo.set("current_tier", self.current_tier_edit.text().strip())
         self.settings_repo.set("guild_us_rank", self.guild_rank_edit.text().strip())
         self.settings_repo.set("progression_weight_multiplier", self.progression_weight_spin.value())
@@ -481,6 +511,66 @@ class SettingsPage(QWidget):
     def _on_discord_test_failed(self, message: str) -> None:
         self.task_panel.reset()
         show_error(self, "Discord test failed", message)
+
+    # -- guild icon management -------------------------------------------
+
+    @staticmethod
+    def _build_button(label: str, handler) -> QPushButton:
+        button = QPushButton(label)
+        button.clicked.connect(handler)
+        return button
+
+    def _guild_region_realm(self) -> tuple[str, str]:
+        characters = CharacterRepository(self.db).list_all(enabled_only=True)
+        primary = next((c for c in characters if c.character_role == "primary"), None)
+        primary = primary or (characters[0] if characters else None)
+        if primary is None:
+            return "", ""
+        return primary.region, primary.server
+
+    def _current_guild_identity(self) -> tuple[str, str, str] | None:
+        guild_name = self.guild_name_edit.text().strip()
+        if not guild_name:
+            show_error(self, "No guild name set", "Enter a guild name above first.")
+            return None
+        region, realm = self._guild_region_realm()
+        return region, realm, guild_name
+
+    def _on_refresh_guild_icon(self) -> None:
+        identity = self._current_guild_identity()
+        if identity is None:
+            return
+        get_or_create_guild_icon(self.db, *identity)
+        show_info(self, "Guild icon refreshed", "The guild icon cache has been refreshed.")
+
+    def _on_choose_custom_guild_icon(self) -> None:
+        identity = self._current_guild_identity()
+        if identity is None:
+            return
+        path, _filter = QFileDialog.getOpenFileName(
+            self, "Choose a local guild image", "", "Images (*.png *.jpg *.jpeg *.bmp *.svg)"
+        )
+        if not path:
+            return
+        set_custom_guild_icon(self.db, *identity, image_path=path)
+        show_info(
+            self, "Custom guild icon set",
+            "This image stays local and is never uploaded or committed automatically.",
+        )
+
+    def _on_clear_guild_icon(self) -> None:
+        identity = self._current_guild_identity()
+        if identity is None:
+            return
+        clear_guild_icon(self.db, *identity)
+        show_info(self, "Guild icon cleared", "The cached guild icon has been removed.")
+
+    def _on_reset_guild_icon(self) -> None:
+        identity = self._current_guild_identity()
+        if identity is None:
+            return
+        reset_to_automatic_guild_icon(self.db, *identity)
+        show_info(self, "Guild icon reset", "Ascend will generate a fresh automatic badge.")
 
 
 def _horizontal(*widgets: QWidget):

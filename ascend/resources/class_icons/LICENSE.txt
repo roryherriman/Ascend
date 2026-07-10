@@ -1,0 +1,16 @@
+Ascend class glyph icon set
+===========================
+
+All SVG files in this directory are original, hand-authored abstract
+glyphs created for the Ascend project. They are colored using the
+conventional World of Warcraft class colors (widely published reference
+hex values, not themselves a copyrighted asset), but the glyph shapes
+are original artwork and do not reproduce Blizzard Entertainment's class
+icon artwork, or any other third-party icon set.
+
+World of Warcraft, class names, and related trademarks are the property
+of Blizzard Entertainment. See docs/ASSET_LICENSES.md for the full
+disclaimer. Ascend is not affiliated with or endorsed by Blizzard
+Entertainment or Warcraft Logs.
+
+License: same license as the Ascend project itself.

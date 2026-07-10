@@ -11,6 +11,12 @@ do I correct mistakes?*, and *is there real evidence I'm a standout player?*
 
 > Ascend is an independent, unofficial tool. It is not affiliated with,
 > endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs.
+>
+> World of Warcraft and related assets are trademarks or copyrighted
+> materials of Blizzard Entertainment. Ascend is an independent community
+> project and is not affiliated with or endorsed by Blizzard Entertainment
+> or Warcraft Logs. See [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md)
+> for how class and guild imagery is sourced.
 
 ## Development status: Phase 1 (Foundation)
 
@@ -42,7 +48,12 @@ builds on. It does **not** yet compute scores, insights, or readiness - see
 - Demo Mode architecture (a fully separate database seeded with sanitized
   sample data)
 - A first-run setup wizard shell
-- Unit tests (56 passing) using sanitized mock API responses - no live API
+- An Ascend visual identity: centralized design tokens/theme, an original
+  icon set, and a grouped sidebar/redesigned Dashboard
+- Original World of Warcraft class glyph icons and class-color accents for
+  configured characters, plus a generated (or user-chosen custom) guild
+  badge - see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md)
+- Unit tests (70 passing) using sanitized mock API responses - no live API
   calls during tests
 
 **In progress / planned:** see [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -91,6 +102,7 @@ Phase 4 build, you'll be able to just double-click `Ascend.exe`.
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) - SQLite schema and versioning
 - [docs/WCL_API.md](docs/WCL_API.md) - verified Warcraft Logs API v2 usage
 - [docs/SECURITY.md](docs/SECURITY.md) - credential storage and logging policy
+- [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md) - class/guild imagery sourcing and disclaimer
 - [docs/ROADMAP.md](docs/ROADMAP.md) - phase-by-phase feature plan
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - dev setup, testing, branching
 
