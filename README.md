@@ -9,6 +9,16 @@ Ascend is a free Windows desktop app for competitive World of Warcraft raiders. 
 
 ---
 
+## Built differently, built transparently
+
+Ascend was built by one person — a technology professional with a background in systems, infrastructure, and enterprise IT who is also a competitive WoW raider. It was not built by a team, a company, or someone with a traditional software-development background.
+
+It was built with significant use of AI tools. That is disclosed here because the creator believes you should know how a tool that handles your credentials and personal data was made. Every decision, every feature, and every release is human-directed. The AI generated code; the creator reviewed, tested, and owns it.
+
+The full story: [docs/about/creator-story.md](docs/about/creator-story.md) · [docs/about/ai-assisted-development.md](docs/about/ai-assisted-development.md)
+
+---
+
 ## Download and install
 
 Download the latest **Ascend-Setup-x.x.x.exe** from the [Releases page](https://github.com/roryherriman/Ascende/releases).
