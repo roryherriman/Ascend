@@ -19,6 +19,7 @@ from ascend.data.database import Database
 from ascend.data.models import Character
 from ascend.data.repositories import CharacterRepository
 from ascend.ui.dialogs import CharacterDialog, confirm, show_error
+from ascend.ui.widgets import make_badge
 
 COLUMNS = [
     "Display Name", "Character Name", "Region", "Server", "WCL ID",
@@ -108,6 +109,8 @@ class CharactersPage(QWidget):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setSortingEnabled(True)
         layout.addWidget(self.table, stretch=1)
 
         self.reload()
@@ -117,6 +120,7 @@ class CharactersPage(QWidget):
         self._populate_table(self._characters)
 
     def _populate_table(self, characters: list[Character]) -> None:
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(len(characters))
         for row, character in enumerate(characters):
             values = [
@@ -127,7 +131,7 @@ class CharactersPage(QWidget):
                 str(character.wcl_character_id) if character.wcl_character_id else "",
                 character.character_class or "",
                 character.character_role,
-                "Yes" if character.enabled else "No",
+                "",  # Enabled - rendered as a badge widget below
                 character.notes or "",
             ]
             for col, value in enumerate(values):
@@ -135,6 +139,16 @@ class CharactersPage(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, character.id)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, col, item)
+
+            badge = make_badge("ENABLED" if character.enabled else "DISABLED",
+                                tone="success" if character.enabled else "neutral")
+            badge_wrap = QWidget()
+            badge_layout = QHBoxLayout(badge_wrap)
+            badge_layout.setContentsMargins(4, 2, 4, 2)
+            badge_layout.addWidget(badge)
+            badge_layout.addStretch()
+            self.table.setCellWidget(row, 7, badge_wrap)
+        self.table.setSortingEnabled(True)
 
     def _apply_filter(self, text: str) -> None:
         text = text.strip().lower()

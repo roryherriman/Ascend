@@ -1,0 +1,10 @@
+Ascend icon set
+===============
+
+All SVG files in this directory (ascend/resources/icons/) are original,
+hand-authored geometric line icons created for the Ascend project. They do
+not reproduce or derive from Blizzard Entertainment, Warcraft Logs, Discord,
+Raider.IO, or any other third-party icon set, logo, or game artwork.
+
+License: same license as the Ascend project itself. You may use, modify,
+and redistribute these icons as part of Ascend or derivative works.
