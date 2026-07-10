@@ -128,6 +128,26 @@ MIGRATIONS: list[Migration] = [
         );
         """,
     ),
+    Migration(
+        version=3,
+        description="Guild icon cache (World of Warcraft visual integration)",
+        sql="""
+        CREATE TABLE IF NOT EXISTS guild_icons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cache_key TEXT NOT NULL UNIQUE,
+            region TEXT,
+            realm TEXT,
+            guild_name TEXT,
+            guild_id INTEGER,
+            source_url TEXT,
+            source_type TEXT NOT NULL DEFAULT 'generated_fallback'
+                CHECK (source_type IN ('generated_fallback', 'custom_local', 'official_api')),
+            cache_file_path TEXT,
+            retrieval_status TEXT NOT NULL DEFAULT 'ok',
+            last_retrieved_at TEXT NOT NULL
+        );
+        """,
+    ),
 ]
 
 

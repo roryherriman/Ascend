@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QUrl, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
@@ -37,8 +37,10 @@ from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
+from ascend.services.guild_icon_service import get_guild_badge_pixmap
 from ascend.services.sync_service import sync_report_by_code
 from ascend.theme import apply_card_elevation
+from ascend.ui.class_icons import class_color, class_icon
 from ascend.ui.dialogs import show_error, show_info
 from ascend.ui.icons import icon
 from ascend.ui.widgets import BackgroundTaskPanel, InfoCard, MetricCard, make_badge
@@ -240,39 +242,131 @@ class DashboardPage(QWidget):
         score_layout.addWidget(score_note)
         row.addWidget(score_card, stretch=2)
 
-        character_card = InfoCard("Character")
-        primary = self._primary_character_text()
-        character_value = QLabel(primary)
-        character_value.setStyleSheet("font-size: 15px; font-weight: 600;")
-        character_value.setWordWrap(True)
-        character_card.add_widget(character_value)
-        character_hint = QLabel("Manage characters on the Characters page.")
-        character_hint.setProperty("class", "muted")
-        character_hint.setWordWrap(True)
-        character_card.add_widget(character_hint)
-        row.addWidget(character_card, stretch=1)
-
-        guild_rank_card = InfoCard("Guild Rank")
-        guild_rank = self.settings_repo.get("guild_us_rank", "") if hasattr(self, "settings_repo") else ""
-        rank_value = QLabel(guild_rank or "--")
-        rank_value.setStyleSheet("font-size: 15px; font-weight: 600;")
-        guild_rank_card.add_widget(rank_value)
-        rank_hint = QLabel("Set in Settings.")
-        rank_hint.setProperty("class", "muted")
-        guild_rank_card.add_widget(rank_hint)
-        row.addWidget(guild_rank_card, stretch=1)
+        row.addWidget(self._build_character_card(), stretch=1)
+        row.addWidget(self._build_guild_card(), stretch=1)
 
         return row
 
-    def _primary_character_text(self) -> str:
+    def _primary_character(self):
         from ascend.data.repositories import CharacterRepository
 
         characters = CharacterRepository(self.db).list_all(enabled_only=True)
         primary = next((c for c in characters if c.character_role == "primary"), None)
-        primary = primary or (characters[0] if characters else None)
+        return primary or (characters[0] if characters else None)
+
+    def _build_character_card(self) -> QFrame:
+        card = QFrame()
+        card.setProperty("class", "card")
+        apply_card_elevation(card)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+
+        title = QLabel("Character")
+        title.setStyleSheet("font-size: 13px; font-weight: 600;")
+        layout.addWidget(title)
+
+        primary = self._primary_character()
+        body_row = QHBoxLayout()
+        body_row.setSpacing(10)
+
+        icon_frame = QFrame()
+        icon_frame.setFixedSize(48, 48)
+        accent = class_color(primary.character_class if primary else None)
+        icon_frame.setStyleSheet(
+            f"background-color: rgba(255,255,255,10); border: 2px solid {accent}; border-radius: 24px;"
+        )
+        icon_layout = QVBoxLayout(icon_frame)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setPixmap(class_icon(primary.character_class if primary else None).pixmap(28, 28))
+        icon_layout.addWidget(icon_label)
+        body_row.addWidget(icon_frame)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(1)
         if primary is None:
-            return "No character configured"
-        return f"{primary.display_name} ({primary.character_class or 'Unknown class'})"
+            name_label = QLabel("No character configured")
+            name_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+            text_col.addWidget(name_label)
+        else:
+            name_label = QLabel(primary.display_name)
+            name_label.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {accent};")
+            text_col.addWidget(name_label)
+            class_label = QLabel(primary.character_class or "Unknown class")
+            class_label.setProperty("class", "muted")
+            text_col.addWidget(class_label)
+            realm_label = QLabel(f"{primary.server} — {primary.region}")
+            realm_label.setProperty("class", "muted")
+            realm_label.setStyleSheet("font-size: 11px;")
+            text_col.addWidget(realm_label)
+        text_col.addStretch()
+        body_row.addLayout(text_col)
+        body_row.addStretch()
+        layout.addLayout(body_row)
+
+        hint = QLabel("Manage characters on the Characters page.")
+        hint.setProperty("class", "muted")
+        hint.setStyleSheet("font-size: 11px;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        return card
+
+    def _build_guild_card(self) -> QFrame:
+        card = QFrame()
+        card.setProperty("class", "card")
+        apply_card_elevation(card)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+
+        title = QLabel("Guild")
+        title.setStyleSheet("font-size: 13px; font-weight: 600;")
+        layout.addWidget(title)
+
+        guild_name = self.settings_repo.get("guild_name", "")
+        guild_rank = self.settings_repo.get("guild_us_rank", "")
+        primary = self._primary_character()
+
+        body_row = QHBoxLayout()
+        body_row.setSpacing(10)
+
+        badge_label = QLabel()
+        badge_label.setFixedSize(48, 48)
+        region = primary.region if primary else ""
+        realm = primary.server if primary else ""
+        badge_pixmap = get_guild_badge_pixmap(self.db, region, realm, guild_name, size=48)
+        badge_label.setPixmap(badge_pixmap)
+        body_row.addWidget(badge_label)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(1)
+        name_label = QLabel(guild_name or "No guild set")
+        name_label.setStyleSheet("font-size: 15px; font-weight: 700;")
+        name_label.setWordWrap(True)
+        text_col.addWidget(name_label)
+        if primary is not None:
+            realm_label = QLabel(f"{primary.server} — {primary.region}")
+            realm_label.setProperty("class", "muted")
+            realm_label.setStyleSheet("font-size: 11px;")
+            text_col.addWidget(realm_label)
+        rank_label = QLabel(f"US Rank: {guild_rank}" if guild_rank else "US Rank: --")
+        rank_label.setProperty("class", "muted")
+        text_col.addWidget(rank_label)
+        text_col.addStretch()
+        body_row.addLayout(text_col)
+        body_row.addStretch()
+        layout.addLayout(body_row)
+
+        hint = QLabel("Set guild name and rank in Settings.")
+        hint.setProperty("class", "muted")
+        hint.setStyleSheet("font-size: 11px;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        return card
 
     # -- Key metrics grid -------------------------------------------------
 

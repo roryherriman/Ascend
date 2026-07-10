@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ascend.data.database import Database
 from ascend.data.models import Character
 from ascend.data.repositories import CharacterRepository
+from ascend.ui.class_icons import class_color, class_icon
 from ascend.ui.dialogs import CharacterDialog, confirm, show_error
 from ascend.ui.widgets import make_badge
 
@@ -129,7 +130,7 @@ class CharactersPage(QWidget):
                 character.region,
                 character.server,
                 str(character.wcl_character_id) if character.wcl_character_id else "",
-                character.character_class or "",
+                "",  # Class - rendered as an icon + text widget below
                 character.character_role,
                 "",  # Enabled - rendered as a badge widget below
                 character.notes or "",
@@ -139,6 +140,19 @@ class CharactersPage(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, character.id)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(row, col, item)
+
+            class_wrap = QWidget()
+            class_layout = QHBoxLayout(class_wrap)
+            class_layout.setContentsMargins(6, 2, 4, 2)
+            class_layout.setSpacing(6)
+            class_icon_label = QLabel()
+            class_icon_label.setPixmap(class_icon(character.character_class).pixmap(18, 18))
+            class_layout.addWidget(class_icon_label)
+            class_text = QLabel(character.character_class or "Unknown")
+            class_text.setStyleSheet(f"color: {class_color(character.character_class)};")
+            class_layout.addWidget(class_text)
+            class_layout.addStretch()
+            self.table.setCellWidget(row, 5, class_wrap)
 
             badge = make_badge("ENABLED" if character.enabled else "DISABLED",
                                 tone="success" if character.enabled else "neutral")
