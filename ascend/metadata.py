@@ -7,8 +7,8 @@ from __future__ import annotations
 
 APP_NAME = "Ascend"
 APP_TAGLINE = "Progression Performance Intelligence"
-APP_VERSION = "0.1.0"
-BUILD_NUMBER = "1"
+APP_VERSION = "0.2.0"
+BUILD_NUMBER = "2"
 COPYRIGHT = "Copyright (c) 2026 Rory Herriman"
 
 GITHUB_REPO = "roryherriman/Ascend"

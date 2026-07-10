@@ -1,153 +1,86 @@
 # Ascend
 
-**Know exactly how you're performing in raid — with the evidence to back it up.**
+**Understand how you actually perform during progression — not just what color your parse is.**
 
-Ascend is a free Windows desktop app for competitive World of Warcraft raiders. It pulls your raid data from Warcraft Logs and gives you a clear, honest breakdown of how you're performing across your whole progression tier — not just a parse color, but real answers to questions like *am I actually improving?*, *do I keep dying to the same mechanic?*, and *is my attendance and effort showing up in the data?*
+Ascend is a free Windows desktop app for World of Warcraft raiders. It connects to Warcraft Logs and analyzes your raid history across an entire tier, helping you understand:
 
-> Ascend is an independent community tool. It is not affiliated with, endorsed by,
-> or sponsored by Blizzard Entertainment or Warcraft Logs.
+- whether you are improving
+- how often you die early
+- whether you repeat the same mistakes
+- how consistent your performance is
+- how you compare with your own raid team
+- whether missing data is affecting the result
 
----
-
-## Built differently, built transparently
-
-Ascend was built by one person — a technology professional with a background in systems, infrastructure, and enterprise IT who is also a competitive WoW raider. It was not built by a team, a company, or someone with a traditional software-development background.
-
-It was built with significant use of AI tools. That is disclosed here because the creator believes you should know how a tool that handles your credentials and personal data was made. Every decision, every feature, and every release is human-directed. The AI generated code; the creator reviewed, tested, and owns it.
-
-The full story: [docs/about/creator-story.md](docs/about/creator-story.md) · [docs/about/ai-assisted-development.md](docs/about/ai-assisted-development.md)
+Ascend is an independent community project and is not affiliated with Blizzard Entertainment or Warcraft Logs.
 
 ---
 
-## Download and install
+## Download
 
-Download the latest **Ascend-Setup-x.x.x.exe** from the [Releases page](https://github.com/roryherriman/Ascende/releases).
+Download the latest portable build from the **Releases** page:
 
-Run the installer — no Python, no terminal, no source code required. Ascend installs to Program Files and creates a Start Menu shortcut. Your data is stored separately in `%LOCALAPPDATA%\Ascend\` and is never deleted when you upgrade or uninstall.
+**[Ascend-Portable-0.2.0.zip](https://github.com/roryherriman/Ascende/releases/tag/v0.2.0)**
+
+Unzip anywhere and run `Ascend.exe`. No installation required.
+
+> **Windows SmartScreen** may warn that Ascend is from an unknown publisher. This is expected for an unsigned community tool. Click **More info → Run anyway** to proceed.
 
 **Windows 10 and 11 (64-bit) are supported.**
-
-> **Note:** Windows SmartScreen may warn that Ascend is from an unknown publisher. This is expected for an unsigned community tool. Click "More info → Run anyway" to proceed. Code signing is planned for a future release.
-
-If you prefer not to use the installer, a **portable ZIP** (`Ascend-Portable-x.x.x.zip`) is also available — unzip anywhere and run `Ascend.exe`. No installation required.
 
 ---
 
 ## What Ascend does
 
-### Tracks your full progression arc
+Ascend pulls your raid data from Warcraft Logs and organizes it across an entire progression tier — every pull, every boss, every raid night.
 
-Every pull you've logged on a boss — from your first wipe to your kill and every farm reclear after — is organized into a clear timeline. You can see exactly which pull you got the kill, how your kill rate improved across pull ranges (pulls 1–10, 11–25, 26–50, 51+), and how your team's performance changed night to night.
+From that data it builds:
 
-### Shows you how you're actually improving
-
-The Trends page charts your kill rate across pull ranges so you can see whether you're genuinely learning a boss or spinning your wheels. It compares early pulls against late progression pulls and tells you whether your raid is trending in the right direction.
-
-### Breaks down your performance score with full evidence
-
-The Insights page gives you a confidence-weighted score across seven categories:
-
-| Category | What it measures |
-|---|---|
-| **Survival** | How often you're alive, how early you die, and where you fall in the death order |
-| **Execution** | How consistently you handle assigned mechanics and avoid confirmed failures |
-| **Damage** | Boss damage and priority target damage relative to your raidmates, adjusted for time alive |
-| **Consistency** | How stable your performance is pull to pull — not just your best parse |
-| **Learning** | How quickly your wipe rate drops and mistakes get corrected over progression |
-| **Utility** | Defensive cooldown usage, interrupts, dispels, and configured assignments |
-| **Participation** | How often you're present across all logged raid nights |
-
-Every score shows you exactly how it was computed: the raw value, the comparison baseline, how confident Ascend is in the number, and how many pulls it's based on. Nothing is hidden.
-
-### Keeps data quality honest
-
-If Ascend doesn't have enough data to score a category reliably — too few pulls, missing event data, unrecognized character — it tells you. Missing data lowers confidence, not the score itself. You won't get a misleadingly low score just because a category couldn't be measured.
-
-### Exports your data
-
-Save your encounter progression summary and roster attendance as CSV or a styled HTML report you can open in any browser.
-
----
-
-## What makes it different from just looking at Warcraft Logs
-
-Warcraft Logs shows you where you rank on a given parse. Ascend looks across your entire tier and asks different questions:
-
-- Are you improving pull over pull, or are you stuck?
-- Do you die to the same mechanic repeatedly, or are your deaths random?
-- Is your participation and preparation actually reflected in the data?
-- What does your performance look like on progression pulls specifically, not just your best farm kill?
-
-Parse color tells you how you compare to everyone who's ever done the fight. Ascend tells you how *you're* doing relative to your own history and your own raidmates.
+- a **pull-by-pull timeline** showing when you got each kill and how your kill rate changed across progression
+- a **death breakdown** flagging how often you die early and whether you repeat the same deaths
+- a **performance score** across seven categories (survival, execution, damage, consistency, learning, utility, participation), each with a confidence level based on how much data Ascend actually has
+- a **roster comparison** showing how your attendance and performance compare to your raidmates
+- a **data quality view** that tells you when data is missing or too thin to score reliably
 
 ---
 
 ## First-time setup
 
-1. Install Ascend using the installer from the [Releases page](https://github.com/roryherriman/Ascende/releases).
-2. Launch Ascend from the Start Menu.
+1. Download and unzip `Ascend-Portable-0.2.0.zip`.
+2. Run `Ascend.exe`.
 3. The setup wizard walks you through:
-   - **Your profile** — display name and preferred region (US, EU, KR, TW, CN)
-   - **Warcraft Logs credentials** — client ID and secret from the WCL API
-   - **Connection test** — verify Ascend can reach Warcraft Logs
-   - **Your characters** — name, realm (autocomplete), class, and role (tank/healer/ranged/melee)
-   - **Raid context** — current tier (dropdown) and guild rank
-   - **Scoring preferences**, Discord webhook, data folder, and optional first report import
-4. Paste a Warcraft Logs report URL in the Dashboard and click **Analyze**.
-
-### Getting Warcraft Logs API credentials
-
-Ascend uses the official Warcraft Logs API — the same one third-party tools like raid planners and log viewers use. To get credentials:
-
-1. Go to [warcraftlogs.com/api/clients](https://www.warcraftlogs.com/api/clients/)
-2. Click **Create Client** and give it any name (e.g. "Ascend")
-3. Copy the **Client ID** and **Client Secret** into Ascend's Settings page
-
-Your credentials stay on your computer — they are never sent anywhere except directly to Warcraft Logs to authenticate.
+   - Your display name and preferred region
+   - Warcraft Logs client credentials (create a free client at [warcraftlogs.com/api/clients](https://www.warcraftlogs.com/api/clients/))
+   - A connection test
+   - Your characters (name, realm, class, role)
+   - Your current raid tier and guild rank
+4. Paste a Warcraft Logs report URL into the Dashboard and click **Analyze**.
 
 ---
 
 ## Your data stays on your computer
 
-Ascend is local-first. Your raid analysis, character history, encounter data, and settings are stored in a SQLite database on your own machine at `%LOCALAPPDATA%\Ascend\`. Nothing is uploaded to any server. The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
+Ascend is local-first. Everything it stores — raid analysis, character history, settings — lives in a SQLite database on your machine at `%LOCALAPPDATA%\Ascend\`. Nothing is uploaded anywhere.
 
-Your Warcraft Logs client secret is stored in the Windows Credential Manager — the same system your browser uses for saved passwords. It is never written to a plain text file or database.
+The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
 
-### Backup and restore
+Your Warcraft Logs client secret is stored in Windows Credential Manager, not in a plain-text file.
 
-Use **File → Back Up Ascend Data** to save a timestamped copy of your database. Use **File → Restore Ascend Data** to replace your current database with a backup. Use **File → Open Data Folder** to browse your data directory directly.
-
----
-
-## What's available now
-
-- **Dashboard** — overview of your raid activity and quick insights
-- **Reports** — import and manage your Warcraft Logs reports
-- **Raid Night Summary** — pull counts, kills, and encounter breakdown per night
-- **Encounter Analysis** — per-boss pull history with progression vs. farm classification
-- **Encounter Progression** — visual progression arc from first pull to kill, pull-range bucket stats
-- **Learning & Trends** — kill rate trends across pull ranges and raid nights
-- **Death Review** — raw death evidence from your logs (structured parsing coming with verified event data)
-- **Roster Comparison** — attendance across everyone you raid with
-- **Data Quality** — flags characters not yet matched, reports with gaps, and small sample sizes
-- **Insights** — full score breakdown with category-by-category evidence
-- **Export** — save encounter and roster data as CSV or HTML
+**Backup:** File → Back Up Ascend Data saves a timestamped copy. File → Restore Ascend Data restores from a backup.
 
 ---
 
-## Running from source (developers)
+## Running from source
 
-If you want to run from the Python source instead of the installer:
+If you want to run from the Python source instead of the portable build:
 
 1. Install **Python 3.11** (64-bit).
-2. Double-click **`setup.bat`** to create the virtual environment and install dependencies.
-3. Double-click **`run_app.bat`** to launch Ascend.
+2. Run `setup.bat` to create the virtual environment and install dependencies.
+3. Run `run_app.bat` to launch Ascend.
 
-To build the Windows installer yourself:
+To build the portable ZIP yourself:
 
 ```
-scripts\build_portable.bat    # runs tests, builds dist\Ascend\
-scripts\build_installer.bat   # requires Inno Setup 6 installed
+scripts\build_portable.bat
 ```
 
 ---
@@ -156,4 +89,4 @@ scripts\build_installer.bat   # requires Inno Setup 6 installed
 
 Ascend is an independent community project and is not affiliated with, endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs.
 
-World of Warcraft and related trademarks are the property of Blizzard Entertainment. Class icons and imagery used in Ascend are sourced and used in accordance with Blizzard's fan content policies — see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md).
+World of Warcraft and related trademarks are the property of Blizzard Entertainment. Class icons and imagery used in Ascend are sourced in accordance with Blizzard's fan content policies — see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md).
