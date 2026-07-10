@@ -215,6 +215,7 @@ class MainWindow(QMainWindow):
             f"<p><i>{metadata.APP_TAGLINE}</i></p>"
             f"<p>Version {metadata.APP_VERSION} (build {metadata.BUILD_NUMBER})</p>"
             f"<p>{metadata.COPYRIGHT}</p>"
+            f"<p style='color:#aaa'>Human-directed. AI-assisted. Built transparently.</p>"
             f"<hr>"
             f"<p style='font-size:11px;color:#999'>{metadata.DISCLAIMER}</p>"
             f"<p><a href='{metadata.GITHUB_URL}' style='color:#7eb3f5'>{metadata.GITHUB_URL}</a></p>"
