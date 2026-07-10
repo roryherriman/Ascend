@@ -40,6 +40,23 @@ no region field, so matching a participant to a tracked `Character` is
 name+server only - see `ascend/services/character_detection.py` for the
 documented limitation this implies.
 
+**`ZONE_DIFFICULTIES_QUERY`** - `Query.worldData.zone(id: Int) { id, name,
+difficulties { id, name } }` (verified against `zone.doc.html` /
+`worlddata.doc.html` / `difficulty.doc.html`). `Fight.difficulty` is a bare
+int with no self-describing enum - difficulty ids/names are scoped per
+zone, so this resolves a fight's difficulty to a label like "Mythic". See
+`ascend/services/zone_data.py` (cached indefinitely per zone - the mapping
+is effectively static once a tier ships).
+
+**`DEATH_TABLE_QUERY`** - `Query.reportData.report(code: String) {
+table(dataType: Deaths, fightIDs: [Int]) }` (verified against
+`report.doc.html` / `tabledatatype.doc.html`). `Report.table` returns a bare
+`JSON` scalar - WCL publishes no GraphQL type for its contents and the
+schema explicitly warns this data "is not considered frozen." Ascend caches
+the raw payload (`ascend/services/death_data.py`) and displays it as-is
+(`ascend/ui/death_review_page.py`) rather than asserting a field-level
+structure it can't verify against the schema.
+
 ## Error handling (`ascend/api/client.py`)
 
 | Condition | Behavior |

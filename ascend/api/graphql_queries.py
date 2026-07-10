@@ -21,6 +21,13 @@ zone.doc.html / worlddata.doc.html / difficulty.doc.html), so resolving a
 fight's difficulty to a label like "Mythic" requires a separate
 worldData.zone(id).difficulties lookup keyed by the report's zone id - see
 ZONE_DIFFICULTIES_QUERY and ascend/services/zone_data.py.
+
+Report.table(dataType: TableDataType, fightIDs: [Int]) (verified against
+report.doc.html / tabledatatype.doc.html) returns a bare `JSON` scalar - WCL
+does not publish a GraphQL type for its contents (the schema explicitly
+warns "this data is not considered frozen"). Ascend therefore treats the
+payload as opaque/best-effort rather than asserting a field-level contract
+it can't verify - see ascend/services/death_data.py.
 """
 
 ZONE_DIFFICULTIES_QUERY = """
@@ -33,6 +40,16 @@ query ZoneDifficulties($zoneId: Int!) {
         id
         name
       }
+    }
+  }
+}
+"""
+
+DEATH_TABLE_QUERY = """
+query DeathTable($code: String!, $fightIds: [Int]) {
+  reportData {
+    report(code: $code) {
+      table(dataType: Deaths, fightIDs: $fightIds)
     }
   }
 }

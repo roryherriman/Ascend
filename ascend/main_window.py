@@ -13,6 +13,7 @@ from ascend.ui.characters_page import CharactersPage, seed_initial_characters
 from ascend.ui.components import ToastOverlay
 from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.data_quality_page import DataQualityPage
+from ascend.ui.death_review_page import DeathReviewPage
 from ascend.ui.diagnostics import DiagnosticsPage
 from ascend.ui.encounter_page import EncounterAnalysisPage
 from ascend.ui.raid_night_page import RaidNightSummaryPage
@@ -23,17 +24,6 @@ from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 # key -> (development phase, note, planned capabilities, icon name)
 PLACEHOLDER_META: dict[str, dict] = {
-    "deaths": dict(
-        phase=3,
-        note="Death Review will show the evidence behind every death - never labeling one avoidable without a basis.",
-        planned=[
-            "Death timeline and evidence",
-            "Manual classification (avoidable / assignment failure / unknown)",
-            "Defensive and consumable timeline",
-            "Repeated-cause tracking by ability",
-        ],
-        icon="deaths",
-    ),
     "trends": dict(
         phase=3,
         note="Learning and Trends will track how quickly you correct mistakes across a tier.",
@@ -228,6 +218,8 @@ class MainWindow(QMainWindow):
                 page = RosterComparisonPage(self.db)
             elif key == "data_quality":
                 page = DataQualityPage(self.db)
+            elif key == "deaths":
+                page = DeathReviewPage(self.db, self.secure_storage, self.task_manager)
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":

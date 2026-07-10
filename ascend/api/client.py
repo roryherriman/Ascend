@@ -12,7 +12,12 @@ from typing import Any
 import requests
 
 from ascend.api.auth import OAuthClient, WCLAuthError, WCLNetworkError
-from ascend.api.graphql_queries import RATE_LIMIT_QUERY, REPORT_BY_CODE_QUERY, ZONE_DIFFICULTIES_QUERY
+from ascend.api.graphql_queries import (
+    DEATH_TABLE_QUERY,
+    RATE_LIMIT_QUERY,
+    REPORT_BY_CODE_QUERY,
+    ZONE_DIFFICULTIES_QUERY,
+)
 from ascend.logging_setup import get_logger
 
 GRAPHQL_URL = "https://www.warcraftlogs.com/api/v2/client"
@@ -129,3 +134,12 @@ class WCLClient:
         world_data = data.get("worldData") or {}
         zone = world_data.get("zone") or {}
         return zone.get("difficulties") or []
+
+    def fetch_death_table(self, report_code: str, fight_ids: list[int] | None = None) -> Any:
+        """Returns Report.table(dataType: Deaths) for the given fights - an
+        opaque JSON payload (see graphql_queries.py docstring), not a
+        schema-verified structure. Ascend caches and displays this
+        best-effort rather than asserting a field contract it can't verify."""
+        data = self.execute(DEATH_TABLE_QUERY, {"code": report_code, "fightIds": fight_ids})
+        report = (data.get("reportData") or {}).get("report") or {}
+        return report.get("table")
