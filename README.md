@@ -1,138 +1,111 @@
 # Ascend
 
-**Progression Performance Intelligence** for competitive World of Warcraft raiders.
+**Know exactly how you're performing in raid — with the evidence to back it up.**
 
-Ascend is a local-first Windows desktop application that analyzes your raid
-performance using the official [Warcraft Logs API v2](https://www.warcraftlogs.com/api/docs)
-(OAuth client-credentials + GraphQL). It does not scrape Warcraft Logs web
-pages, and it is not another parse-color viewer - the goal is evidence-based
-answers to questions like *am I improving during progression?*, *how quickly
-do I correct mistakes?*, and *is there real evidence I'm a standout player?*
+Ascend is a free Windows desktop app for competitive World of Warcraft raiders. It pulls your raid data from Warcraft Logs and gives you a clear, honest breakdown of how you're performing across your whole progression tier — not just a parse color, but real answers to questions like *am I actually improving?*, *do I keep dying to the same mechanic?*, and *is my attendance and effort showing up in the data?*
 
-> Ascend is an independent, unofficial tool. It is not affiliated with,
-> endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs.
->
-> World of Warcraft and related assets are trademarks or copyrighted
-> materials of Blizzard Entertainment. Ascend is an independent community
-> project and is not affiliated with or endorsed by Blizzard Entertainment
-> or Warcraft Logs. See [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md)
-> for how class and guild imagery is sourced.
+> Ascend is an independent community tool. It is not affiliated with, endorsed by,
+> or sponsored by Blizzard Entertainment or Warcraft Logs.
 
-## Development status: Phase 1 (Foundation)
+---
 
-This drop delivers the application shell and the plumbing everything else
-builds on. It does **not** yet compute scores, insights, or readiness - see
-[docs/ROADMAP.md](docs/ROADMAP.md) for what's implemented vs. planned.
+## What Ascend does
 
-**Implemented in Phase 1:**
-- Ascend branding, dark-themed PySide6 shell, sidebar navigation (18 sections)
-- Centralized theme + reusable widgets (stat cards, banners, progress panels)
-- Settings page: Warcraft Logs credentials, scoring weights, thresholds,
-  sample-size minimums, cache/timeout, Discord webhook, data/export locations,
-  Demo Mode toggle
-- Secure credential storage via Windows Credential Manager, with a clearly
-  flagged encrypted (DPAPI) local fallback
-- Character management (add/edit/remove/enable), stored in SQLite - never
-  hardcoded
-- Warcraft Logs OAuth client-credentials authentication + Test Connection
-- A Warcraft Logs report URL/code parser (`ascend/api/url_parser.py`)
-- Basic report retrieval: paste a URL or report code, fetch report + fight
-  metadata, store it, with duplicate-safe upserts
-- SQLite storage with versioned migrations, raw-API-response preservation,
-  and an analysis-versioning schema for future reanalysis
-- Background worker infrastructure (`QThreadPool`/`QRunnable`) so API calls
-  never freeze the GUI, with progress + cancellation
-- Session-operation tracking (detects an unclean previous shutdown)
-- Rotating local logging and a Diagnostics page (never logs or displays
-  secrets)
-- Demo Mode architecture (a fully separate database seeded with sanitized
-  sample data)
-- A first-run setup wizard shell
-- An Ascend visual identity: centralized design tokens/theme, an original
-  icon set, and a grouped sidebar/redesigned Dashboard
-- Original World of Warcraft class glyph icons and class-color accents for
-  configured characters, plus a generated (or user-chosen custom) guild
-  badge - see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md)
-- Unit tests (70 passing) using sanitized mock API responses - no live API
-  calls during tests
+### Tracks your full progression arc
 
-**In progress / planned:** see [docs/ROADMAP.md](docs/ROADMAP.md).
+Every pull you've logged on a boss — from your first wipe to your kill and every farm reclear after — is organized into a clear timeline. You can see exactly which pull you got the kill, how your kill rate improved across pull ranges (pulls 1–10, 11–25, 26–50, 51+), and how your team's performance changed night to night.
 
-## Local-first architecture
+### Shows you how you're actually improving
 
-Warcraft Logs data, analysis results, settings, encounter rules, and history
-stay on your computer. Nothing is uploaded anywhere except the report codes
-you explicitly fetch from Warcraft Logs, and summaries you explicitly post to
-Discord (Phase 4).
+The Trends page charts your kill rate across pull ranges so you can see whether you're genuinely learning a boss or spinning your wheels. It compares early pulls against late progression pulls and tells you whether your raid is trending in the right direction.
 
-## Stack
+### Breaks down your performance score with full evidence
 
-Python 3.11+, PySide6, SQLite, Warcraft Logs API v2 (OAuth client-credentials
-+ GraphQL), Plotly (for later charts), PyInstaller, pytest, keyring/pywin32
-for secure storage.
+The Insights page gives you a confidence-weighted score across seven categories:
 
-## Getting started (Windows)
+| Category | What it measures |
+|---|---|
+| **Survival** | How often you're alive, how early you die, and where you fall in the death order |
+| **Execution** | How consistently you handle assigned mechanics and avoid confirmed failures |
+| **Damage** | Boss damage and priority target damage relative to your raidmates, adjusted for time alive |
+| **Consistency** | How stable your performance is pull to pull — not just your best parse |
+| **Learning** | How quickly your wipe rate drops and mistakes get corrected over progression |
+| **Utility** | Defensive cooldown usage, interrupts, dispels, and configured assignments |
+| **Participation** | How often you're present across all logged raid nights |
 
-1. Install Python 3.11+ (check "Add python.exe to PATH" during install).
-2. Double-click **`setup.bat`** - creates a virtual environment, installs
-   dependencies, and runs the test suite.
+Every score shows you exactly how it was computed: the raw value, the comparison baseline, how confident Ascend is in the number, and how many pulls it's based on. Nothing is hidden.
+
+### Keeps data quality honest
+
+If Ascend doesn't have enough data to score a category reliably — too few pulls, missing event data, unrecognized character — it tells you. Missing data lowers confidence, not the score itself. You won't get a misleadingly low score just because a category couldn't be measured.
+
+### Exports your data
+
+Save your encounter progression summary and roster attendance as CSV or a styled HTML report you can open in any browser. No formatting, no spreadsheet gymnastics — just the data.
+
+---
+
+## What makes it different from just looking at Warcraft Logs
+
+Warcraft Logs shows you where you rank on a given parse. Ascend looks across your entire tier and asks different questions:
+
+- Are you improving pull over pull, or are you stuck?
+- Do you die to the same mechanic repeatedly, or are your deaths random?
+- Is your participation and preparation actually reflected in the data?
+- What does your performance look like on progression pulls specifically, not just your best farm kill?
+
+Parse color tells you how you compare to everyone who's ever done the fight. Ascend tells you how *you're* doing relative to your own history and your own raidmates.
+
+---
+
+## Getting started
+
+1. Install **Python 3.11+** (check "Add python.exe to PATH" during install).
+2. Double-click **`setup.bat`** — sets up the environment and installs everything automatically.
 3. Double-click **`run_app.bat`** to launch Ascend.
-4. On first launch, the setup wizard walks you through Warcraft Logs
-   credentials, characters, and preferences. You can also configure
-   everything later from **Settings**.
+4. On first launch, enter your Warcraft Logs API credentials and add your character. You can get free API credentials at [warcraftlogs.com](https://www.warcraftlogs.com/api/clients/).
+5. Paste any Warcraft Logs report URL into Ascend and click **Analyze** to import it.
 
-No command line is required after the initial `setup.bat` run. After a
-Phase 4 build, you'll be able to just double-click `Ascend.exe`.
+No command line needed after setup.
 
-## Security and privacy
+### Getting Warcraft Logs API credentials
 
-- Your Warcraft Logs client secret and Discord webhook URL are **never**
-  stored in plain text in SQLite, YAML, or source code.
-- They're stored via the Windows Credential Manager (through the `keyring`
-  package). If that's unavailable, Ascend falls back to a DPAPI-encrypted
-  local file tied to your Windows login, and clearly warns you in Settings
-  when this fallback is active.
-- Access tokens are cached in memory only - never logged, displayed, or
-  exported.
-- See [docs/SECURITY.md](docs/SECURITY.md) for details.
+Ascend uses the official Warcraft Logs API — the same one third-party tools like raid planners and log viewers use. To get credentials:
 
-## Documentation
+1. Go to [warcraftlogs.com/api/clients](https://www.warcraftlogs.com/api/clients/)
+2. Click **Create Client** and give it any name (e.g. "Ascend")
+3. Copy the **Client ID** and **Client Secret** into Ascend's Settings page
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - app structure, data flow, session recovery
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) - SQLite schema and versioning
-- [docs/WCL_API.md](docs/WCL_API.md) - verified Warcraft Logs API v2 usage
-- [docs/SECURITY.md](docs/SECURITY.md) - credential storage and logging policy
-- [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md) - class/guild imagery sourcing and disclaimer
-- [docs/ROADMAP.md](docs/ROADMAP.md) - phase-by-phase feature plan
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - dev setup, testing, branching
+Your credentials stay on your computer — they are never sent anywhere except directly to Warcraft Logs to authenticate.
 
-## Known limitations (Phase 1)
+---
 
-- No scoring, classification, insights, readiness, or roster comparison yet -
-  Dashboard cards are placeholders until Phase 2/3.
-- "Analyze a Raid Night" currently performs URL parsing + basic report/fight
-  retrieval only; full character detection, metrics, and summaries land in
-  Phase 2.
-- Most sidebar sections (Raid Night Summary, Encounter Analysis, Death
-  Review, Roster Comparison, Learning and Trends, Insights, Readiness, Goals,
-  Raid Night Comparison, Encounter Progression, Encounter Rules, Data
-  Quality, Export and Discord) are placeholders that state which phase they
-  arrive in.
-- The Windows executable build (`build_windows.bat`) works but isn't yet
-  polished with icons/portable packaging - that's Phase 4.
+## Your data stays on your computer
 
-## Testing
+Ascend is local-first. Your raid analysis, character history, encounter data, and settings are stored in a SQLite database on your own machine. Nothing is uploaded to any server. The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
 
-```
-setup.bat
-```
+Your Warcraft Logs client secret is stored in the Windows Credential Manager — the same system your browser uses for saved passwords. It is never written to a plain text file or database.
 
-runs the full suite automatically. To re-run manually:
+---
 
-```
-call .venv\Scripts\activate.bat
-pytest -q
-```
+## What's available now
 
-All tests use sanitized mock API responses; no live Warcraft Logs API calls
-are made during the test suite.
+- **Dashboard** — overview of your raid activity and quick insights
+- **Reports** — import and manage your Warcraft Logs reports
+- **Raid Night Summary** — pull counts, kills, and encounter breakdown per night
+- **Encounter Analysis** — per-boss pull history with progression vs. farm classification
+- **Encounter Progression** — visual progression arc from first pull to kill, pull-range bucket stats
+- **Learning & Trends** — kill rate trends across pull ranges and raid nights
+- **Death Review** — raw death evidence from your logs (structured parsing coming with verified event data)
+- **Roster Comparison** — attendance across everyone you raid with
+- **Data Quality** — flags characters not yet matched, reports with gaps, and small sample sizes
+- **Insights** — full score breakdown with category-by-category evidence
+- **Export** — save encounter and roster data as CSV or HTML
+
+---
+
+## Disclaimer
+
+Ascend is an independent community project and is not affiliated with, endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs.
+
+World of Warcraft and related trademarks are the property of Blizzard Entertainment. Class icons and imagery used in Ascend are sourced and used in accordance with Blizzard's fan content policies — see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md).
