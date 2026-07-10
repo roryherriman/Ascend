@@ -13,23 +13,13 @@ from ascend.ui.characters_page import CharactersPage, seed_initial_characters
 from ascend.ui.components import ToastOverlay
 from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.diagnostics import DiagnosticsPage
+from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
 from ascend.ui.settings_page import SettingsPage
 from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 # key -> (development phase, note, planned capabilities, icon name)
 PLACEHOLDER_META: dict[str, dict] = {
-    "raid_night": dict(
-        phase=2,
-        note="The Raid Night Summary will bring together everything Ascend knows about one raid night.",
-        planned=[
-            "Overview: pulls, kills, duration, score, classification",
-            "Participation and survival breakdown",
-            "Pull-by-pull table with evidence",
-            "Roster comparison for that night",
-        ],
-        icon="raid_night",
-    ),
     "encounter": dict(
         phase=2,
         note="Encounter Analysis will let you drill into one boss across pulls and raid nights.",
@@ -213,6 +203,7 @@ class MainWindow(QMainWindow):
         self._page_indices: dict[str, int] = {}
         self._nav_labels = dict(NAV_ITEMS)
         self._build_pages()
+        self._wire_cross_page_navigation()
 
         # A full-width status bar isn't used for messaging (see navigation/visual
         # spec) - Qt still creates one lazily via statusBar(), so keep it hidden.
@@ -255,6 +246,10 @@ class MainWindow(QMainWindow):
                 page = CharactersPage(self.db)
             elif key == "reports":
                 page = ReportsPage(self.db, self.secure_storage, self.task_manager)
+                self.reports_page = page
+            elif key == "raid_night":
+                page = RaidNightSummaryPage(self.db)
+                self.raid_night_page = page
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
@@ -271,10 +266,29 @@ class MainWindow(QMainWindow):
             index = self.stack.addWidget(page)
             self._page_indices[key] = index
 
+    def _wire_cross_page_navigation(self) -> None:
+        if hasattr(self, "reports_page") and hasattr(self, "raid_night_page"):
+            self.reports_page.view_raid_night_requested.connect(self._open_raid_night_summary)
+            self.raid_night_page.view_reports_requested.connect(
+                lambda: self.sidebar.select_section("reports")
+            )
+
+    def _open_raid_night_summary(self, report_id: int) -> None:
+        self.sidebar.select_section("raid_night")
+        self.raid_night_page.select_report(report_id)
+
     def _on_section_selected(self, key: str) -> None:
         index = self._page_indices.get(key)
         if index is not None:
             self.stack.setCurrentIndex(index)
+            # Reports/Raid Night Summary are built once at startup, so refresh
+            # their data on every visit rather than only at construction time -
+            # otherwise a report synced from another page (e.g. the Dashboard)
+            # wouldn't show up until the app restarted.
+            page = self.stack.widget(index)
+            reload_fn = getattr(page, "reload", None)
+            if callable(reload_fn):
+                reload_fn()
         self._settings.setValue("window/last_page", key)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt override signature

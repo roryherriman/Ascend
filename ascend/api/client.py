@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 from ascend.api.auth import OAuthClient, WCLAuthError, WCLNetworkError
-from ascend.api.graphql_queries import RATE_LIMIT_QUERY, REPORT_BY_CODE_QUERY
+from ascend.api.graphql_queries import RATE_LIMIT_QUERY, REPORT_BY_CODE_QUERY, ZONE_DIFFICULTIES_QUERY
 from ascend.logging_setup import get_logger
 
 GRAPHQL_URL = "https://www.warcraftlogs.com/api/v2/client"
@@ -120,3 +120,12 @@ class WCLClient:
         data = self.execute(REPORT_BY_CODE_QUERY, {"code": report_code})
         report_data = data.get("reportData") or {}
         return report_data.get("report")
+
+    def fetch_zone_difficulties(self, zone_id: int) -> list[dict[str, Any]]:
+        """Returns this zone's `[{id, name}]` difficulty list (e.g. Mythic,
+        Heroic), used to label a Fight.difficulty int - see
+        ascend/services/zone_data.py."""
+        data = self.execute(ZONE_DIFFICULTIES_QUERY, {"zoneId": zone_id})
+        world_data = data.get("worldData") or {}
+        zone = world_data.get("zone") or {}
+        return zone.get("difficulties") or []

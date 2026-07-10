@@ -14,6 +14,28 @@ name+server only, not region-qualified. See
 ascend/services/character_detection.py for the documented limitation this
 implies (a same-named character on the same realm name in a different
 region would be ambiguous - out of scope for a personal-scale tracker).
+
+Fight.difficulty is a bare Int with no self-describing enum - Difficulty ids
+and names are scoped per-Zone (Zone.difficulties, verified against
+zone.doc.html / worlddata.doc.html / difficulty.doc.html), so resolving a
+fight's difficulty to a label like "Mythic" requires a separate
+worldData.zone(id).difficulties lookup keyed by the report's zone id - see
+ZONE_DIFFICULTIES_QUERY and ascend/services/zone_data.py.
+"""
+
+ZONE_DIFFICULTIES_QUERY = """
+query ZoneDifficulties($zoneId: Int!) {
+  worldData {
+    zone(id: $zoneId) {
+      id
+      name
+      difficulties {
+        id
+        name
+      }
+    }
+  }
+}
 """
 
 RATE_LIMIT_QUERY = """
