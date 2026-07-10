@@ -35,6 +35,41 @@ from ascend.ui.dialogs import CharacterDialog, show_error, show_info
 from ascend.ui.widgets import BackgroundTaskPanel
 
 
+class PlayerProfilePage(QWizardPage):
+    def __init__(self, settings_repo: SettingsRepository):
+        super().__init__()
+        self.settings_repo = settings_repo
+        self.setTitle("Your Profile")
+
+        form = QFormLayout(self)
+        self.display_name_edit = QLineEdit(self.settings_repo.get("player_display_name", ""))
+        self.display_name_edit.setPlaceholderText("e.g. Aeloria, or your guild nickname")
+        form.addRow("Your name:", self.display_name_edit)
+
+        from PySide6.QtWidgets import QComboBox
+        self.region_combo = QComboBox()
+        self.region_combo.addItems(["US", "EU", "KR", "TW", "CN"])
+        preferred = self.settings_repo.get("preferred_region", "US")
+        if preferred in ["US", "EU", "KR", "TW", "CN"]:
+            self.region_combo.setCurrentText(preferred)
+        form.addRow("Your region:", self.region_combo)
+
+        note = QLabel(
+            "This is used to pre-fill character fields and personalise the app. "
+            "You can change it any time in Settings."
+        )
+        note.setProperty("class", "muted")
+        note.setWordWrap(True)
+        form.addRow("", note)
+
+    def validatePage(self) -> bool:
+        name = self.display_name_edit.text().strip()
+        if name:
+            self.settings_repo.set("player_display_name", name)
+        self.settings_repo.set("preferred_region", self.region_combo.currentText())
+        return True
+
+
 class WelcomePage(QWizardPage):
     def __init__(self):
         super().__init__()
@@ -177,9 +212,10 @@ class CharactersSetupPage(QWizardPage):
             self._char_list_layout.addWidget(label)
 
     def _on_add(self) -> None:
-        from ascend.data.repositories import CharacterRepository
+        from ascend.data.repositories import CharacterRepository, SettingsRepository
 
-        dialog = CharacterDialog(self)
+        preferred_region = SettingsRepository(self.db).get("preferred_region", "US")
+        dialog = CharacterDialog(self, default_region=preferred_region)
         if dialog.exec():
             CharacterRepository(self.db).create(dialog.result_character())
             self._refresh_char_list(self.db)
@@ -367,6 +403,7 @@ class FirstRunWizard(QWizard):
         settings_repo = SettingsRepository(db)
 
         self.addPage(WelcomePage())
+        self.addPage(PlayerProfilePage(settings_repo))
         self.addPage(LocalFirstPage())
         self.addPage(CredentialsPage(settings_repo, secure_storage))
         self.addPage(TestConnectionPage(settings_repo, secure_storage, task_manager))

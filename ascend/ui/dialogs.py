@@ -48,7 +48,12 @@ def confirm(parent: QWidget | None, title: str, message: str) -> bool:
 class CharacterDialog(QDialog):
     """Add or edit a character. Characters are stored in SQLite, never hardcoded."""
 
-    def __init__(self, parent: QWidget | None = None, character: Character | None = None):
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        character: Character | None = None,
+        default_region: str | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Edit Character" if character else "Add Character")
         self.setMinimumWidth(380)
@@ -58,6 +63,8 @@ class CharacterDialog(QDialog):
         self.character_name_edit = QLineEdit()
         self.region_combo = QComboBox()
         self.region_combo.addItems(REGIONS)
+        if default_region and default_region in REGIONS:
+            self.region_combo.setCurrentText(default_region)
         self.server_edit = QLineEdit()
         self.wcl_id_edit = QLineEdit()
         self.class_combo = QComboBox()
