@@ -11,6 +11,13 @@ __pycache__/
 build/
 dist/
 *.spec.bak
+# Ascend.spec is tracked (authoritative build config) — generated artefacts are not
+version_info.txt
+SHA256SUMS.txt
+Ascend-Portable-*.zip
+
+# Installer output
+installer/Output/
 
 # Local data, secrets, and user-generated content - never commit
 .env

@@ -1,0 +1,141 @@
+name: Windows Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ascend/**'
+      - 'app.py'
+      - 'Ascend.spec'
+      - 'requirements*.txt'
+      - 'scripts/**'
+      - 'installer/**'
+      - '.github/workflows/windows-release.yml'
+
+jobs:
+  test-and-build:
+    name: Test + Build (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install runtime dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install build dependencies
+        run: pip install -r requirements-build.txt
+
+      - name: Run tests (headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: pytest -q --tb=short
+
+      - name: Generate version info
+        run: python scripts/generate_version_info.py
+
+      - name: Read version
+        id: version
+        run: |
+          $v = python -c "from ascend.metadata import APP_VERSION; print(APP_VERSION)"
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build portable (PyInstaller)
+        run: pyinstaller --noconfirm Ascend.spec
+
+      - name: Verify build output
+        shell: cmd
+        run: |
+          if not exist "dist\Ascend\Ascend.exe" (
+            echo FAIL: dist\Ascend\Ascend.exe not found
+            exit /b 1
+          )
+          if not exist "dist\Ascend\_internal\ascend\resources\icons\dashboard.svg" (
+            echo FAIL: icons not bundled
+            exit /b 1
+          )
+          if not exist "dist\Ascend\_internal\ascend\resources\demo_report.json" (
+            echo FAIL: demo report not bundled
+            exit /b 1
+          )
+          echo PASS: build output verified
+
+      - name: Create portable ZIP
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          Compress-Archive -Path "dist\Ascend\*" -DestinationPath "Ascend-Portable-$version.zip" -Force
+
+      - name: Generate SHA-256 checksums
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $zip = "Ascend-Portable-$version.zip"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          "$hash  $zip" | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Upload portable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-Portable-${{ steps.version.outputs.version }}
+          path: Ascend-Portable-${{ steps.version.outputs.version }}.zip
+          retention-days: 14
+
+      - name: Upload SHA256SUMS
+        uses: actions/upload-artifact@v4
+        with:
+          name: SHA256SUMS
+          path: SHA256SUMS.txt
+          retention-days: 14
+
+      # Installer build — only on version tags, requires Inno Setup
+      - name: Install Inno Setup
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: cmd
+        run: |
+          set VERSION=${{ steps.version.outputs.version }}
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=%VERSION% installer\ascend.iss
+
+      - name: Checksum installer
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $installer = "installer\Output\Ascend-Setup-$version.exe"
+          if (Test-Path $installer) {
+            $hash = (Get-FileHash $installer -Algorithm SHA256).Hash
+            "$hash  Ascend-Setup-$version.exe" | Out-File -Encoding ascii SHA256SUMS.txt -Append
+          }
+
+      - name: Upload installer artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ascend-Setup-${{ steps.version.outputs.version }}
+          path: installer/Output/Ascend-Setup-${{ steps.version.outputs.version }}.exe
+          retention-days: 90
+
+      # Create GitHub Release on version tags
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Ascend-Portable-${{ steps.version.outputs.version }}.zip
+            installer/Output/Ascend-Setup-${{ steps.version.outputs.version }}.exe
+            SHA256SUMS.txt
+          generate_release_notes: true
+          draft: true

@@ -1,11 +1,11 @@
 """Loads Ascend's original SVG icon set - see resources/icons/LICENSE.txt."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtGui import QIcon
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent / "resources" / "icons"
+from ascend.resources import resource_path
+
+_ICONS_DIR = resource_path("ascend", "resources", "icons")
 _cache: dict[str, QIcon] = {}
 
 

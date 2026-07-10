@@ -11,11 +11,11 @@ through class_icon()/class_color() so the mapping stays centralized.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtGui import QIcon, QPixmap
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent / "resources" / "class_icons"
+from ascend.resources import resource_path
+
+_ICONS_DIR = resource_path("ascend", "resources", "class_icons")
 
 CLASS_COLORS: dict[str, str] = {
     "Death Knight": "#C41F3B",

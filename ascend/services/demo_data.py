@@ -8,14 +8,14 @@ Warcraft Logs credentials.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from ascend.data.database import Database
+from ascend.resources import resource_path
 from ascend.data.repositories import ReportRepository
 from ascend.services.background_worker import CancellationToken
 from ascend.services.sync_service import sync_report_by_code
 
-_DEMO_REPORT_PATH = Path(__file__).resolve().parent.parent / "resources" / "demo_report.json"
+_DEMO_REPORT_PATH = resource_path("ascend", "resources", "demo_report.json")
 
 
 class _DemoClient:

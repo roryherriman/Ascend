@@ -1,8 +1,21 @@
 """Main application window: sidebar navigation + stacked pages."""
 from __future__ import annotations
 
-from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+from PySide6.QtCore import QSettings, QUrl
+from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QMainWindow,
+    QMessageBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ascend.data.database import Database
 from ascend.data.repositories import SessionOperationRepository
@@ -142,6 +155,8 @@ class MainWindow(QMainWindow):
         # spec) - Qt still creates one lazily via statusBar(), so keep it hidden.
         self.statusBar().setVisible(False)
 
+        self._build_menu_bar()
+
         self.sidebar.section_selected.connect(self._on_section_selected)
         self._restore_last_page()
 
@@ -155,6 +170,120 @@ class MainWindow(QMainWindow):
                     tone="warning",
                 ),
             )
+
+    def _build_menu_bar(self) -> None:
+        from ascend.data.database import default_app_data_root
+        from ascend import metadata
+
+        mb = self.menuBar()
+
+        file_menu = mb.addMenu("&File")
+
+        open_data = QAction("Open Data Folder", self)
+        open_data.setStatusTip("Open the folder where Ascend stores your database and exports")
+        open_data.triggered.connect(self._open_data_folder)
+        file_menu.addAction(open_data)
+
+        file_menu.addSeparator()
+
+        backup_action = QAction("Back Up Ascend Data…", self)
+        backup_action.setStatusTip("Save a timestamped copy of your database to the backups folder")
+        backup_action.triggered.connect(self._backup_data)
+        file_menu.addAction(backup_action)
+
+        restore_action = QAction("Restore Ascend Data…", self)
+        restore_action.setStatusTip("Replace the current database with a backup (requires restart)")
+        restore_action.triggered.connect(self._restore_data)
+        file_menu.addAction(restore_action)
+
+        help_menu = mb.addMenu("&Help")
+
+        about_action = QAction("About Ascend", self)
+        about_action.triggered.connect(lambda: QMessageBox.about(
+            self,
+            "About Ascend",
+            f"<b>Ascend</b> — {metadata.APP_TAGLINE}<br><br>"
+            f"Version {metadata.APP_VERSION} (build {metadata.BUILD_NUMBER})<br>"
+            f"{metadata.COPYRIGHT}<br><br>"
+            f"{metadata.DISCLAIMER}",
+        ))
+        help_menu.addAction(about_action)
+
+        updates_action = QAction("Check for Updates", self)
+        updates_action.setStatusTip("Visit the Ascend releases page")
+        updates_action.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"https://github.com/{metadata.GITHUB_REPO}/releases"))
+        )
+        help_menu.addAction(updates_action)
+
+    def _open_data_folder(self) -> None:
+        from ascend.data.database import default_app_data_root
+        folder = default_app_data_root()
+        folder.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _backup_data(self) -> None:
+        from ascend.data.database import default_app_data_root
+        app_root = default_app_data_root()
+        db_path = self.db.db_path
+        if not db_path.exists():
+            QMessageBox.warning(self, "Back Up Data", "No database file found to back up.")
+            return
+
+        backups_dir = app_root / "backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        dest = backups_dir / f"ascend_backup_{stamp}.db"
+        try:
+            shutil.copy2(str(db_path), str(dest))
+            QMessageBox.information(
+                self, "Back Up Data",
+                f"Backup saved to:\n{dest}\n\nYour data is unchanged."
+            )
+        except OSError as exc:
+            QMessageBox.critical(self, "Back Up Data", f"Backup failed:\n{exc}")
+
+    def _restore_data(self) -> None:
+        from ascend.data.database import default_app_data_root
+        app_root = default_app_data_root()
+        backups_dir = app_root / "backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose Backup to Restore",
+            str(backups_dir), "Database files (*.db)"
+        )
+        if not path:
+            return
+
+        confirm = QMessageBox.warning(
+            self, "Restore Ascend Data",
+            "This will replace your current database with the selected backup.\n\n"
+            "Your current data will be backed up first, then Ascend will close.\n"
+            "Restart Ascend after the restore completes.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        db_path = self.db.db_path
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        pre_backup = app_root / "backups" / f"ascend_pre_restore_{stamp}.db"
+        try:
+            if db_path.exists():
+                shutil.copy2(str(db_path), str(pre_backup))
+            self.db.close()
+            shutil.copy2(path, str(db_path))
+            QMessageBox.information(
+                self, "Restore Complete",
+                f"Restore complete. Previous data saved to:\n{pre_backup}\n\n"
+                "Please restart Ascend."
+            )
+            self.close()
+        except OSError as exc:
+            QMessageBox.critical(self, "Restore Failed", f"Restore failed:\n{exc}\n\nYour original data is intact.")
 
     def _restore_geometry(self) -> None:
         geometry = self._settings.value("window/geometry")

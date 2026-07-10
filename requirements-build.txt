@@ -1,0 +1,19 @@
+# Build-only dependencies for Ascend packaging
+# Runtime dependencies are in requirements.txt
+#
+# Supported build environment:
+#   Python 3.11 (64-bit)
+#   Windows 10 / 11 (64-bit)
+#   PySide6 6.7.x (pinned in requirements.txt)
+#
+# Install:
+#   pip install -r requirements-build.txt
+
+# PyInstaller — portable folder + exe packaging
+# pyinstaller-hooks-contrib provides auto-hooks for PySide6 / Qt
+pyinstaller>=6.3
+pyinstaller-hooks-contrib>=2024.0
+
+# Test runner (also in requirements.txt but repeated here for CI clarity)
+pytest>=7.4
+pytest-qt>=4.4
