@@ -12,10 +12,12 @@ from ascend.services.background_worker import BackgroundTaskManager
 from ascend.ui.characters_page import CharactersPage, seed_initial_characters
 from ascend.ui.components import ToastOverlay
 from ascend.ui.dashboard_page import DashboardPage
+from ascend.ui.data_quality_page import DataQualityPage
 from ascend.ui.diagnostics import DiagnosticsPage
 from ascend.ui.encounter_page import EncounterAnalysisPage
 from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
+from ascend.ui.roster_page import RosterComparisonPage
 from ascend.ui.settings_page import SettingsPage
 from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
@@ -31,16 +33,6 @@ PLACEHOLDER_META: dict[str, dict] = {
             "Repeated-cause tracking by ability",
         ],
         icon="deaths",
-    ),
-    "roster": dict(
-        phase=2,
-        note="Roster Comparison will show how you stack up against the players you actually raid with.",
-        planned=[
-            "Same-spec and same-class comparison",
-            "Ranged DPS and full roster percentile",
-            "Sortable tables with percentile bars",
-        ],
-        icon="roster",
     ),
     "trends": dict(
         phase=3,
@@ -113,16 +105,6 @@ PLACEHOLDER_META: dict[str, dict] = {
             "Severity, weight, and confidence per rule",
         ],
         icon="rules",
-    ),
-    "data_quality": dict(
-        phase=2,
-        note="Data Quality will make sure Ascend never silently ignores missing or uncertain data.",
-        planned=[
-            "Sync success/failure tracking",
-            "Small-sample warnings",
-            "Character-identity confidence",
-        ],
-        icon="data_quality",
     ),
     "export": dict(
         phase=3,
@@ -242,6 +224,10 @@ class MainWindow(QMainWindow):
                 self.raid_night_page = page
             elif key == "encounter":
                 page = EncounterAnalysisPage(self.db)
+            elif key == "roster":
+                page = RosterComparisonPage(self.db)
+            elif key == "data_quality":
+                page = DataQualityPage(self.db)
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
