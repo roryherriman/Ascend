@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPlainTextEdit,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -175,6 +176,8 @@ class RaidNightSummaryPage(QWidget):
         content_row.addWidget(self._build_roster_panel(), stretch=5)
         detail_layout.addLayout(content_row, stretch=1)
 
+        detail_layout.addWidget(self._build_notes_panel())
+
         self._layout.addWidget(self.detail_container, stretch=1)
 
         self.reload()
@@ -257,6 +260,44 @@ class RaidNightSummaryPage(QWidget):
 
         return card
 
+    # -- Notes (manual annotation) -------------------------------------------
+
+    def _build_notes_panel(self) -> QFrame:
+        card = QFrame()
+        card.setProperty("class", "card")
+        apply_card_elevation(card)
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
+
+        header_row = QHBoxLayout()
+        title = QLabel("Notes")
+        title.setStyleSheet("font-size: 13px; font-weight: 600;")
+        header_row.addWidget(title)
+        header_row.addStretch()
+        self.save_notes_button = QPushButton("Save Notes")
+        self.save_notes_button.setObjectName("secondaryFlatButton")
+        self.save_notes_button.clicked.connect(self._on_save_notes)
+        header_row.addWidget(self.save_notes_button)
+        layout.addLayout(header_row)
+
+        self.notes_edit = QPlainTextEdit()
+        self.notes_edit.setPlaceholderText(
+            "Add a manual note for this raid night - e.g. why a pull was skipped, "
+            "who was on standby, anything worth remembering later."
+        )
+        self.notes_edit.setFixedHeight(70)
+        layout.addWidget(self.notes_edit)
+
+        return card
+
+    def _on_save_notes(self) -> None:
+        report = self._current_report()
+        if report is None or report.id is None:
+            return
+        self.reports_repo.update_notes(report.id, self.notes_edit.toPlainText())
+        report.notes = self.notes_edit.toPlainText()
+
     # -- Data -----------------------------------------------------------
 
     def reload(self) -> None:
@@ -334,6 +375,7 @@ class RaidNightSummaryPage(QWidget):
         self._overview_labels["pulls"].setText(str(len(fights)))
         self._overview_labels["kills"].setText(f"{kills} / {wipes}")
         self._overview_labels["duration"].setText(_format_duration(0, total_ms) if fights else "--")
+        self.notes_edit.setPlainText(report.notes)
 
         self.pull_table.setRowCount(len(fights))
         for row, fight in enumerate(fights):

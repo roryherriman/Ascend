@@ -18,11 +18,12 @@ place; new phases add new migrations rather than editing old ones.
 | `session_operations` | App-lifecycle tracking for crash/unclean-shutdown detection |
 | `analysis_runs` | Which app/analysis-engine/scoring-model version produced an analysis (schema only until Phase 2/3's engine exists) |
 
-## Phase 2 schema (migration 4)
+## Phase 2 schema (migrations 4-5)
 
-| Table | Purpose |
+| Table / column | Purpose |
 |---|---|
 | `fight_participants` | One row per player actor present in a fight (from `ReportMasterData.actors`, matched against `Fight.friendlyPlayers`), unique on `(fight_id, actor_id)`. `character_id` is set when the actor's name+server matches a tracked Character - see `ascend/services/character_detection.py` - and is `NULL` otherwise (an untracked raid-team member). |
+| `reports.notes` | Manual annotation for a raid night (migration 5), edited on the Raid Night Summary page. `ReportRepository.upsert_report`'s `UPDATE` never touches this column, so re-syncing an already-imported report can't silently erase a note - only `ReportRepository.update_notes()` writes it. |
 
 Secrets are deliberately **not** in this list - see `docs/SECURITY.md`.
 

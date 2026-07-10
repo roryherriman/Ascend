@@ -30,6 +30,7 @@ from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
+from ascend.services.data_quality import DETECTED, character_identity_confidence, small_sample_warnings
 from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AnalyzeBar, KPIRow, ProgressionGauge, TrendChartWidget
 from ascend.ui.icons import icon
@@ -388,6 +389,7 @@ class ActiveAnalyticsState(QWidget):
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
+        self.db = db
         self.reports_repo = ReportRepository(db)
         self.open_reports_requested = open_reports_requested
         self._kpi_metrics: dict[str, object] = {}
@@ -423,9 +425,14 @@ class ActiveAnalyticsState(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(_centered(content, _ACTIVE_MAX_WIDTH))
 
+        self.refresh()
+
+    def refresh(self) -> None:
         self._refresh_recent_raid_nights()
         self._refresh_progression_snapshot()
         self._refresh_kpis()
+        self._refresh_insights()
+        self._refresh_data_quality_banner()
 
     # -- Level 1: Quick Analyze --------------------------------------------
 
@@ -545,9 +552,108 @@ class ActiveAnalyticsState(QWidget):
         self.insights_container = QVBoxLayout()
         self.insights_container.setSpacing(8)
         layout.addLayout(self.insights_container)
+
+        self.insights_empty_label = QLabel("Not enough data for insights yet.")
+        self.insights_empty_label.setProperty("class", "muted")
+        self.insights_empty_label.setWordWrap(True)
+        self.insights_empty_label.setStyleSheet("font-size: 11px;")
+        self.insights_empty_label.setVisible(False)
+        layout.addWidget(self.insights_empty_label)
+
         layout.addStretch()
 
         return card
+
+    def _clear_insights(self) -> None:
+        while self.insights_container.count():
+            item = self.insights_container.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    @staticmethod
+    def _build_insight_row(tone_text: str, tone: str, title_text: str, description_text: str) -> QFrame:
+        from ascend.ui.widgets import make_badge
+
+        row = QFrame()
+        row.setObjectName("insightRow")
+        accent = {"success": PALETTE.success, "warning": PALETTE.warning, "info": PALETTE.info}.get(
+            tone, PALETTE.accent
+        )
+        row.setStyleSheet(f"QFrame#insightRow {{ border-left: 2px solid {accent}; }}")
+        row_layout = QVBoxLayout(row)
+        row_layout.setContentsMargins(8, 2, 0, 2)
+        row_layout.setSpacing(2)
+
+        header_row = QHBoxLayout()
+        header_row.addWidget(make_badge(tone_text, tone=tone))
+        header_row.addStretch()
+        row_layout.addLayout(header_row)
+
+        title_label = QLabel(title_text)
+        title_label.setStyleSheet("font-size: 12px; font-weight: 600;")
+        row_layout.addWidget(title_label)
+
+        desc_label = QLabel(description_text)
+        desc_label.setProperty("class", "muted")
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("font-size: 11px;")
+        row_layout.addWidget(desc_label)
+
+        return row
+
+    def _refresh_insights(self) -> None:
+        """Basic, honestly-derivable insights from data already synced - no
+        scoring engine needed. Explainable/evidence-based insights (Phase 3)
+        will extend this, not replace it."""
+        self._clear_insights()
+
+        reports = self.reports_repo.list_all()
+        all_fights = [f for r in reports if r.id for f in self.reports_repo.fights_for_report(r.id)]
+        insights: list[tuple[str, str, str, str]] = []
+
+        if all_fights:
+            kills = sum(1 for f in all_fights if f.kill)
+            decided = sum(1 for f in all_fights if f.kill is not None)
+            if decided:
+                kill_rate = round(100 * kills / decided)
+                insights.append((
+                    "TREND", "info", "Kill Rate",
+                    f"{kills} of {decided} logged pulls ({kill_rate}%) ended in a kill across "
+                    f"{len(reports)} raid night(s).",
+                ))
+
+            encounter_counts: dict[str, int] = {}
+            for fight in all_fights:
+                if fight.name:
+                    encounter_counts[fight.name] = encounter_counts.get(fight.name, 0) + 1
+            if encounter_counts:
+                busiest_name, busiest_count = max(encounter_counts.items(), key=lambda kv: kv[1])
+                insights.append((
+                    "STRENGTH", "success", "Most-Attempted Encounter",
+                    f"{busiest_name} has the most logged pulls ({busiest_count}).",
+                ))
+
+        not_detected = [c for c in character_identity_confidence(self.db) if c.status != DETECTED and reports]
+        if not_detected:
+            names = ", ".join(c.display_name for c in not_detected)
+            insights.append((
+                "IMPROVE", "warning", "Character Not Yet Detected",
+                f"{names} hasn't been matched in any synced report - check Data Quality for details.",
+            ))
+
+        if small_sample_warnings(self.db):
+            insights.append((
+                "IMPROVE", "warning", "Small Sample Size",
+                "Some reports or encounters don't have enough pulls logged yet to be very "
+                "meaningful - see Data Quality for details.",
+            ))
+
+        self.insights_empty_label.setVisible(not insights)
+        for tone_text, tone, title_text, description_text in insights:
+            self.insights_container.addWidget(
+                self._build_insight_row(tone_text, tone, title_text, description_text)
+            )
 
     # -- Level 3: KPI row ------------------------------------------------------
 
@@ -567,6 +673,18 @@ class ActiveAnalyticsState(QWidget):
         self._kpi_metrics["bosses_analyzed"].set_value(
             str(len(encounter_names)) if encounter_names else "--"
         )
+        self._kpi_metrics["progression_pulls"].set_value(str(len(all_fights)) if all_fights else "--")
+
+        # Participation: the best-attended tracked character's share of all
+        # synced raid nights - real attendance data, not a fabricated stat.
+        confidence = character_identity_confidence(self.db)
+        detected = [c for c in confidence if c.status == DETECTED]
+        if detected and reports:
+            best = max(detected, key=lambda c: c.raid_nights)
+            pct = round(100 * best.raid_nights / len(reports))
+            self._kpi_metrics["participation"].set_value(f"{pct}%")
+        else:
+            self._kpi_metrics["participation"].set_value("--")
 
     # -- Level 2: Recent Raid Nights ------------------------------------------
 
@@ -715,9 +833,34 @@ class ActiveAnalyticsState(QWidget):
         else:
             self.data_quality_banner.setVisible(False)
 
+    def _refresh_data_quality_banner(self) -> None:
+        warnings = small_sample_warnings(self.db)
+        not_detected = [
+            c for c in character_identity_confidence(self.db)
+            if c.status != DETECTED and self.reports_repo.list_all()
+        ]
+        if not_detected:
+            names = ", ".join(c.display_name for c in not_detected)
+            self.set_data_quality_warning(
+                f"{names} hasn't been detected in any synced report yet - see Data Quality."
+            )
+        elif warnings:
+            self.set_data_quality_warning(
+                f"{len(warnings)} report(s)/encounter(s) have a small pull sample - see Data Quality."
+            )
+        else:
+            self.set_data_quality_warning(None)
+
     # -- Demo Mode preview data --------------------------------------------
 
     def apply_demo_data(self) -> None:
+        # The bundled demo fixture is deliberately thin (no masterData, only
+        # 2 fights) and would otherwise trip the real small-sample/character-
+        # not-detected Data Quality checks - suppressed here since Demo Mode
+        # is meant to showcase the polished Active state, not real data
+        # quality signals about a sample fixture.
+        self.set_data_quality_warning(None)
+
         self.gauge.set_score(84, "strong")
         self.gauge_status_label.setText("STRONG")
         self.gauge_status_label.setStyleSheet(
@@ -751,8 +894,8 @@ class ActiveAnalyticsState(QWidget):
 
         self.trend_chart.set_series([58, 63, 66, 71, 76, 79, 84])
 
-        from ascend.ui.widgets import make_badge
-
+        self._clear_insights()
+        self.insights_empty_label.setVisible(False)
         demo_insights = [
             ("STRENGTH", "success", "Low First-Death Rate",
              "You were among the final 40% of players alive on 94% of progression pulls."),
@@ -762,32 +905,9 @@ class ActiveAnalyticsState(QWidget):
              "Pull-to-pull damage variance improved 14% over the last 3 raid nights."),
         ]
         for tone_text, tone, title_text, description_text in demo_insights:
-            row = QFrame()
-            row.setObjectName("insightRow")
-            accent = {"success": PALETTE.success, "warning": PALETTE.warning, "info": PALETTE.info}.get(
-                tone, PALETTE.accent
+            self.insights_container.addWidget(
+                self._build_insight_row(tone_text, tone, title_text, description_text)
             )
-            row.setStyleSheet(f"QFrame#insightRow {{ border-left: 2px solid {accent}; }}")
-            row_layout = QVBoxLayout(row)
-            row_layout.setContentsMargins(8, 2, 0, 2)
-            row_layout.setSpacing(2)
-
-            header_row = QHBoxLayout()
-            header_row.addWidget(make_badge(tone_text, tone=tone))
-            header_row.addStretch()
-            row_layout.addLayout(header_row)
-
-            title_label = QLabel(title_text)
-            title_label.setStyleSheet("font-size: 12px; font-weight: 600;")
-            row_layout.addWidget(title_label)
-
-            desc_label = QLabel(description_text)
-            desc_label.setProperty("class", "muted")
-            desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("font-size: 11px;")
-            row_layout.addWidget(desc_label)
-
-            self.insights_container.addWidget(row)
 
         demo_rows = [
             ("Jul 12", "Ascend Raiders", "Kysarra", "Dimensius", "31", "84", "STRONG", "+3.2"),

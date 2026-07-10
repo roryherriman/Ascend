@@ -36,6 +36,7 @@ class Report:
     end_time: float | None = None
     fetched_at: str | None = None
     analysis_status: str = "not_analyzed"
+    notes: str = ""
     id: int | None = None
     fight_count: int = 0
     kill_count: int = 0
