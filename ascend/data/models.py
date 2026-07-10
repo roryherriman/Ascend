@@ -17,6 +17,7 @@ class Character:
     wcl_character_id: int | None = None
     character_class: str | None = None
     character_role: str = "primary"  # 'primary' or 'alternate'
+    spec_role: str | None = None  # 'tank', 'healer', 'ranged', 'melee', or None
     enabled: bool = True
     notes: str = ""
     id: int | None = None

@@ -35,8 +35,8 @@ class CharacterRepository:
             """
             INSERT INTO characters
                 (display_name, character_name, region, server, wcl_character_id,
-                 class, character_role, enabled, notes, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 class, character_role, spec_role, enabled, notes, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 character.display_name,
@@ -46,6 +46,7 @@ class CharacterRepository:
                 character.wcl_character_id,
                 character.character_class,
                 character.character_role,
+                character.spec_role,
                 1 if character.enabled else 0,
                 character.notes,
                 now,
@@ -65,8 +66,8 @@ class CharacterRepository:
             """
             UPDATE characters
             SET display_name = ?, character_name = ?, region = ?, server = ?,
-                wcl_character_id = ?, class = ?, character_role = ?, enabled = ?,
-                notes = ?, updated_at = ?
+                wcl_character_id = ?, class = ?, character_role = ?, spec_role = ?,
+                enabled = ?, notes = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -77,6 +78,7 @@ class CharacterRepository:
                 character.wcl_character_id,
                 character.character_class,
                 character.character_role,
+                character.spec_role,
                 1 if character.enabled else 0,
                 character.notes,
                 now,
@@ -105,6 +107,7 @@ class CharacterRepository:
             wcl_character_id=row["wcl_character_id"],
             character_class=row["class"],
             character_role=row["character_role"],
+            spec_role=row["spec_role"] if "spec_role" in row.keys() else None,
             enabled=bool(row["enabled"]),
             notes=row["notes"] or "",
             created_at=row["created_at"],

@@ -174,6 +174,14 @@ MIGRATIONS: list[Migration] = [
         ALTER TABLE reports ADD COLUMN notes TEXT;
         """,
     ),
+    Migration(
+        version=6,
+        description="Productization PR D: spec_role on characters (tank/healer/ranged/melee)",
+        sql="""
+        ALTER TABLE characters ADD COLUMN spec_role TEXT
+            CHECK (spec_role IN ('tank', 'healer', 'ranged', 'melee') OR spec_role IS NULL);
+        """,
+    ),
 ]
 
 
