@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from ascend.data.models import Character
 
 REGIONS = ["US", "EU", "KR", "TW", "CN"]
+SPEC_ROLES = ["", "tank", "healer", "ranged", "melee"]
 CLASSES = [
     "Death Knight", "Demon Hunter", "Druid", "Evoker", "Hunter", "Mage",
     "Monk", "Paladin", "Priest", "Rogue", "Shaman", "Warlock", "Warrior",
@@ -75,6 +76,8 @@ class CharacterDialog(QDialog):
         self.class_combo.addItems(CLASSES)
         self.role_combo = QComboBox()
         self.role_combo.addItems(["primary", "alternate"])
+        self.spec_role_combo = QComboBox()
+        self.spec_role_combo.addItems(SPEC_ROLES)
         self.enabled_checkbox = QCheckBox("Enabled")
         self.enabled_checkbox.setChecked(True)
         self.notes_edit = QPlainTextEdit()
@@ -88,6 +91,7 @@ class CharacterDialog(QDialog):
         form.addRow("Warcraft Logs character ID:", self.wcl_id_edit)
         form.addRow("Class:", self.class_combo)
         form.addRow("Primary / alternate:", self.role_combo)
+        form.addRow("Role (tank/healer/ranged/melee):", self.spec_role_combo)
         form.addRow("", self.enabled_checkbox)
         form.addRow("Notes:", self.notes_edit)
 
@@ -110,6 +114,8 @@ class CharacterDialog(QDialog):
             if character.character_class in CLASSES:
                 self.class_combo.setCurrentText(character.character_class)
             self.role_combo.setCurrentText(character.character_role)
+            if character.spec_role in SPEC_ROLES:
+                self.spec_role_combo.setCurrentText(character.spec_role or "")
             self.enabled_checkbox.setChecked(character.enabled)
             self.notes_edit.setPlainText(character.notes or "")
 
@@ -153,6 +159,7 @@ class CharacterDialog(QDialog):
             wcl_character_id=int(wcl_id_text) if wcl_id_text else None,
             character_class=self.class_combo.currentText(),
             character_role=self.role_combo.currentText(),
+            spec_role=self.spec_role_combo.currentText() or None,
             enabled=self.enabled_checkbox.isChecked(),
             notes=self.notes_edit.toPlainText().strip(),
         )

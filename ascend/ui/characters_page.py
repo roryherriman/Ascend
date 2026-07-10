@@ -24,7 +24,7 @@ from ascend.ui.widgets import make_badge
 
 COLUMNS = [
     "Display Name", "Character Name", "Region", "Server", "WCL ID",
-    "Class", "Role", "Enabled", "Notes",
+    "Class", "Role", "Spec Role", "Enabled", "Notes",
 ]
 
 # Fictional demo roster — used only in Demo Mode, never seeded into real user databases.
@@ -159,9 +159,10 @@ class CharactersPage(QWidget):
                 character.region,
                 character.server,
                 str(character.wcl_character_id) if character.wcl_character_id else "",
-                "",  # Class - rendered as an icon + text widget below
+                "",  # Class - rendered as an icon + text widget below (col 5)
                 character.character_role,
-                "",  # Enabled - rendered as a badge widget below
+                character.spec_role or "",
+                "",  # Enabled - rendered as a badge widget below (col 8)
                 character.notes or "",
             ]
             for col, value in enumerate(values):
@@ -190,7 +191,7 @@ class CharactersPage(QWidget):
             badge_layout.setContentsMargins(4, 2, 4, 2)
             badge_layout.addWidget(badge)
             badge_layout.addStretch()
-            self.table.setCellWidget(row, 7, badge_wrap)
+            self.table.setCellWidget(row, 8, badge_wrap)
         self.table.setSortingEnabled(True)
 
     def _apply_filter(self, text: str) -> None:
