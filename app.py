@@ -56,7 +56,11 @@ def main() -> int:
 
         app_root = default_app_data_root()
         bootstrap_config = load_bootstrap_config(app_root)
-        is_demo = bool(bootstrap_config.get("demo_mode", False))
+        # `--demo` forces Demo Mode for this run only (not persisted to config.json) -
+        # a quick way to preview the Dashboard with realistic sanitized data before
+        # the real analysis engine exists. See docs/ARCHITECTURE.md - Demo Mode.
+        cli_demo_flag = "--demo" in sys.argv[1:]
+        is_demo = bool(bootstrap_config.get("demo_mode", False)) or cli_demo_flag
 
         log_dir = app_root / "logs"
         logger = setup_logging(log_dir)
@@ -65,7 +69,7 @@ def main() -> int:
             metadata.APP_NAME, metadata.APP_VERSION, metadata.BUILD_NUMBER, is_demo,
         )
 
-        db = Database.default_path_instance()
+        db = Database.default_path_instance(demo_override=is_demo if cli_demo_flag else None)
         db.initialize()
 
         settings_repo = SettingsRepository(db)

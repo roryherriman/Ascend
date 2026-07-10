@@ -17,6 +17,27 @@ QFrame.card:hover {{
     border: 1px solid {p.border_strong};
 }}
 
+QFrame.card.elevated {{
+    background-color: {p.bg_card_elevated};
+    border: 1px solid {p.border_strong};
+}}
+
+QWidget#contextChip, QPushButton#contextChip {{
+    background-color: {p.bg_card};
+    border: 1px solid {p.border};
+    border-radius: {t.radii.md}px;
+    text-align: left;
+}}
+
+QPushButton#contextChip:hover, QWidget#contextChip:hover {{
+    background-color: {p.bg_card_hover};
+    border: 1px solid {p.border_strong};
+}}
+
+QWidget#topContextBar {{
+    background-color: transparent;
+}}
+
 QFrame#emptyStatePanel {{
     background-color: {p.bg_card};
     border: 1px dashed {p.border_strong};

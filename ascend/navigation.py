@@ -1,8 +1,9 @@
-"""Sidebar navigation: Ascend mark + grouped section list + footer.
+"""Sidebar navigation: compact Ascend mark + grouped section list + footer.
 
 ``NAV_ITEMS`` stays a flat, ordered list of the real selectable sections (the
 source of truth other code and tests rely on); ``NAV_GROUPS`` only controls
-how they're visually grouped with headers in the sidebar.
+how they're visually grouped with headers in the sidebar. Labels here are
+the short sidebar labels - pages can still show their full title internally.
 """
 from __future__ import annotations
 
@@ -17,28 +18,52 @@ from PySide6.QtWidgets import (
 )
 
 from ascend import metadata
+from ascend.theme import DARK_TOKENS
 from ascend.ui.icons import icon
 
 NAV_ITEMS: list[tuple[str, str]] = [
     ("dashboard", "Dashboard"),
     ("characters", "Characters"),
     ("reports", "Reports"),
-    ("raid_night", "Raid Night Summary"),
-    ("encounter", "Encounter Analysis"),
+    ("raid_night", "Raid Nights"),
+    ("encounter", "Encounters"),
     ("deaths", "Death Review"),
-    ("roster", "Roster Comparison"),
-    ("trends", "Learning and Trends"),
-    ("raid_night_comparison", "Raid Night Comparison"),
-    ("encounter_progression", "Encounter Progression"),
+    ("roster", "Roster"),
+    ("trends", "Trends"),
+    ("raid_night_comparison", "Night Comparison"),
+    ("encounter_progression", "Progression"),
     ("insights", "Insights"),
     ("readiness", "Readiness"),
     ("goals", "Goals"),
-    ("rules", "Encounter Rules"),
+    ("rules", "Rules"),
     ("data_quality", "Data Quality"),
-    ("export", "Export and Discord"),
+    ("export", "Export"),
     ("settings", "Settings"),
     ("diagnostics", "Diagnostics"),
 ]
+
+# Full titles shown inside the page itself (top context bar / page header),
+# since the sidebar label is deliberately shortened for density.
+FULL_TITLES: dict[str, str] = {
+    "dashboard": "Dashboard",
+    "characters": "Characters",
+    "reports": "Reports",
+    "raid_night": "Raid Night Summary",
+    "encounter": "Encounter Analysis",
+    "deaths": "Death Review",
+    "roster": "Roster Comparison",
+    "trends": "Learning and Trends",
+    "raid_night_comparison": "Raid Night Comparison",
+    "encounter_progression": "Encounter Progression",
+    "insights": "Insights",
+    "readiness": "Readiness",
+    "goals": "Goals",
+    "rules": "Encounter Rules",
+    "data_quality": "Data Quality",
+    "export": "Export and Discord",
+    "settings": "Settings",
+    "diagnostics": "Diagnostics",
+}
 
 NAV_GROUPS: list[tuple[str, list[str]]] = [
     ("Overview", ["dashboard", "characters", "reports"]),
@@ -83,7 +108,7 @@ class Sidebar(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(232)
+        self.setFixedWidth(DARK_TOKENS.control.sidebar_width)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -93,7 +118,7 @@ class Sidebar(QWidget):
 
         self.list_widget = QListWidget()
         self.list_widget.setObjectName("navList")
-        self.list_widget.setIconSize(QSize(18, 18))
+        self.list_widget.setIconSize(QSize(16, 16))
         self.list_widget.setUniformItemSizes(False)
         self._populate_items()
         self.list_widget.currentRowChanged.connect(self._on_row_changed)
@@ -107,13 +132,13 @@ class Sidebar(QWidget):
         header = QWidget()
         header.setObjectName("sidebarHeader")
         outer = QVBoxLayout(header)
-        outer.setContentsMargins(16, 18, 16, 14)
-        outer.setSpacing(2)
+        outer.setContentsMargins(14, 12, 14, 10)
+        outer.setSpacing(1)
 
         mark_row = QHBoxLayout()
-        mark_row.setSpacing(8)
+        mark_row.setSpacing(7)
         mark_label = QLabel()
-        mark_label.setPixmap(icon("logo_mark").pixmap(22, 22))
+        mark_label.setPixmap(icon("logo_mark").pixmap(18, 18))
         mark_row.addWidget(mark_label)
 
         name_label = QLabel(metadata.APP_NAME)
@@ -122,10 +147,9 @@ class Sidebar(QWidget):
         mark_row.addStretch()
         outer.addLayout(mark_row)
 
-        tagline_label = QLabel(metadata.APP_TAGLINE)
+        tagline_label = QLabel("Progression Intelligence")
         tagline_label.setProperty("class", "muted")
-        tagline_label.setStyleSheet("font-size: 10px;")
-        tagline_label.setWordWrap(True)
+        tagline_label.setStyleSheet("font-size: 9px;")
         outer.addWidget(tagline_label)
 
         return header
@@ -134,27 +158,52 @@ class Sidebar(QWidget):
         footer = QWidget()
         footer.setObjectName("sidebarFooter")
         layout = QVBoxLayout(footer)
-        layout.setContentsMargins(16, 10, 16, 10)
-        layout.setSpacing(2)
+        layout.setContentsMargins(14, 8, 14, 8)
+        layout.setSpacing(3)
 
+        top_row = QHBoxLayout()
+        top_row.setSpacing(6)
         version_label = QLabel(f"v{metadata.APP_VERSION}")
         version_label.setProperty("class", "caption")
-        layout.addWidget(version_label)
+        top_row.addWidget(version_label)
 
-        mode_label = QLabel("Local-first · no cloud sync")
-        mode_label.setProperty("class", "caption")
-        layout.addWidget(mode_label)
+        phase_label = QLabel("PHASE 1")
+        phase_label.setProperty("class", "caption")
+        phase_label.setStyleSheet(
+            f"color: {DARK_TOKENS.palette.accent_hover}; font-weight: 700;"
+        )
+        top_row.addWidget(phase_label)
+        top_row.addStretch()
+        layout.addLayout(top_row)
+
+        status_row = QHBoxLayout()
+        status_row.setSpacing(6)
+        self.connection_dot = QLabel("●")
+        self.connection_dot.setStyleSheet(f"color: {DARK_TOKENS.palette.text_muted}; font-size: 9px;")
+        status_row.addWidget(self.connection_dot)
+        status_text = QLabel("Local-first")
+        status_text.setProperty("class", "caption")
+        status_row.addWidget(status_text)
+        status_row.addStretch()
+        layout.addLayout(status_row)
 
         return footer
+
+    def set_connection_status(self, connected: bool | None) -> None:
+        """None = not yet tested, True/False = last test result."""
+        color = {
+            None: DARK_TOKENS.palette.text_muted,
+            True: DARK_TOKENS.palette.success,
+            False: DARK_TOKENS.palette.error,
+        }[connected]
+        self.connection_dot.setStyleSheet(f"color: {color}; font-size: 9px;")
 
     def _populate_items(self) -> None:
         labels = dict(NAV_ITEMS)
         for group_label, keys in NAV_GROUPS:
             header_item = QListWidgetItem("")
             header_item.setFlags(Qt.ItemFlag.NoItemFlags)
-            header_item.setSizeHint(
-                QSize(0, 26)
-            )
+            header_item.setSizeHint(QSize(0, 20))
             self.list_widget.addItem(header_item)
             header_label = QLabel(group_label.upper())
             header_label.setObjectName("navGroupLabel")

@@ -11,21 +11,25 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Palette:
-    # Backgrounds
-    bg_app: str          # main window background - near-black charcoal
-    bg_secondary: str     # secondary panels / scroll areas - dark slate
-    bg_sidebar: str        # sidebar - dark graphite
-    bg_card: str            # elevated card background
-    bg_card_hover: str
+    # Backgrounds - three surface levels + sidebar/app, deliberately close in
+    # value so grouping reads from contrast, not from a border around everything.
+    bg_app: str             # main window background - deep navy-charcoal
+    bg_sidebar: str          # sidebar - slightly darker than app background
+    bg_secondary: str         # page container - very subtle contrast vs. app bg
+    bg_card: str                # primary surface (standard panels)
+    bg_card_elevated: str         # elevated surface (emphasized panels: Analyze, Profile)
+    bg_card_hover: str              # hover surface
     bg_input: str
     bg_input_focus: str
-    bg_overlay: str         # loading overlay / scrim
+    bg_overlay: str                  # loading overlay / scrim
 
-    # Accent
+    # Accent - Ascend blue-violet identity
     accent: str
     accent_hover: str
     accent_pressed: str
     accent_muted: str       # low-emphasis accent background (badges, subtle highlights)
+    secondary_accent: str    # violet - paired with accent for gradients/dual-series charts
+    accent_cyan: str          # tertiary accent for chart series / info highlights
 
     # Semantic
     success: str
@@ -40,6 +44,7 @@ class Palette:
     # Text
     text_primary: str
     text_secondary: str
+    text_muted: str
     text_disabled: str
     text_on_accent: str
 
@@ -64,35 +69,51 @@ class Spacing:
 class Radii:
     sm: int = 4
     md: int = 8
-    lg: int = 12
-    xl: int = 16
+    lg: int = 10
+    xl: int = 14
     pill: int = 999
 
 
 @dataclass(frozen=True)
 class TypeScale:
     """(pixel size, weight) pairs for each text role."""
-    app_title: tuple[int, int] = (19, 700)
-    page_title: tuple[int, int] = (22, 700)
-    section_title: tuple[int, int] = (12, 700)
-    card_title: tuple[int, int] = (13, 600)
-    metric_value: tuple[int, int] = (28, 700)
+    app_brand: tuple[int, int] = (20, 600)
+    page_title: tuple[int, int] = (24, 600)
+    page_subtitle: tuple[int, int] = (12, 400)
+    panel_title: tuple[int, int] = (14, 600)
+    metric_value: tuple[int, int] = (24, 600)
+    kpi_label: tuple[int, int] = (10, 700)
     body: tuple[int, int] = (13, 400)
     secondary: tuple[int, int] = (12, 400)
     caption: tuple[int, int] = (11, 500)
     table_text: tuple[int, int] = (13, 400)
     badge_text: tuple[int, int] = (11, 700)
 
+    # Backwards-compatible aliases used by earlier Phase 1 code.
+    @property
+    def app_title(self) -> tuple[int, int]:
+        return self.app_brand
+
+    @property
+    def section_title(self) -> tuple[int, int]:
+        return self.kpi_label
+
+    @property
+    def card_title(self) -> tuple[int, int]:
+        return self.panel_title
+
 
 @dataclass(frozen=True)
 class ControlSizes:
-    input_height: int = 32
-    button_height: int = 34
-    nav_item_height: int = 38
-    table_row_height: int = 34
+    input_height: int = 30
+    button_height: int = 30
+    nav_item_height: int = 32
+    table_row_height: int = 32
     icon_sm: int = 14
     icon_md: int = 18
     icon_lg: int = 24
+    sidebar_width: int = 204
+    kpi_chip_height: int = 56
 
 
 @dataclass(frozen=True)
@@ -106,34 +127,38 @@ class Tokens:
 
 
 DARK_PALETTE = Palette(
-    bg_app="#111214",
-    bg_secondary="#17181c",
-    bg_sidebar="#15161a",
-    bg_card="#1c1e23",
-    bg_card_hover="#23262c",
-    bg_input="#1a1c20",
-    bg_input_focus="#20232a",
-    bg_overlay="rgba(10, 11, 13, 0.72)",
-    accent="#5B8DEF",
-    accent_hover="#7AA2F2",
-    accent_pressed="#4874C9",
-    accent_muted="#25314a",
-    success="#3ABF87",
-    success_muted="#173226",
-    warning="#E3A73E",
-    warning_muted="#3a2d14",
-    error="#E5555F",
-    error_muted="#3a1c1f",
-    info="#4AB8D8",
-    info_muted="#123138",
-    text_primary="#F1F2F4",
-    text_secondary="#9599A2",
-    text_disabled="#5B5E66",
+    bg_app="#070B14",
+    bg_sidebar="#090E18",
+    bg_secondary="#0A1220",
+    bg_card="#0E1626",
+    bg_card_elevated="#131D30",
+    bg_card_hover="#18243A",
+    bg_input="#0B1220",
+    bg_input_focus="#131D30",
+    bg_overlay="rgba(4, 6, 12, 0.72)",
+    accent="#5B7CFF",
+    accent_hover="#7B95FF",
+    accent_pressed="#3F5FE0",
+    accent_muted="#1B2547",
+    secondary_accent="#7C5CFF",
+    accent_cyan="#38BDF8",
+    success="#34D399",
+    success_muted="#0F3328",
+    warning="#FBBF24",
+    warning_muted="#3A2E10",
+    error="#F87171",
+    error_muted="#3A1C1C",
+    info="#38BDF8",
+    info_muted="#0E2F3D",
+    text_primary="#F8FAFC",
+    text_secondary="#A8B3C7",
+    text_muted="#6B7890",
+    text_disabled="#4B5568",
     text_on_accent="#FFFFFF",
-    border="#2A2D33",
-    border_strong="#3A3D45",
-    focus_ring="#5B8DEF",
-    scrollbar="#33363d",
+    border="#22304A",
+    border_strong="#324566",
+    focus_ring="#5B7CFF",
+    scrollbar="#22304A",
 )
 
 DARK_TOKENS = Tokens(palette=DARK_PALETTE)

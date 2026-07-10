@@ -7,9 +7,10 @@ from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLay
 from ascend.data.database import Database
 from ascend.data.repositories import SessionOperationRepository
 from ascend.data.secure_storage import SecureStorage
-from ascend.navigation import NAV_ITEMS, Sidebar
+from ascend.navigation import FULL_TITLES, NAV_ITEMS, Sidebar
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.ui.characters_page import CharactersPage, seed_initial_characters
+from ascend.ui.components import Toast
 from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.diagnostics import DiagnosticsPage
 from ascend.ui.reports_page import ReportsPage
@@ -208,17 +209,24 @@ class MainWindow(QMainWindow):
         self._nav_labels = dict(NAV_ITEMS)
         self._build_pages()
 
-        self.status_bar = self.statusBar()
+        # A full-width status bar isn't used for messaging (see navigation/visual
+        # spec) - Qt still creates one lazily via statusBar(), so keep it hidden.
+        self.statusBar().setVisible(False)
 
         self.sidebar.section_selected.connect(self._on_section_selected)
         self._restore_last_page()
 
         if self._had_unclean_previous_shutdown:
-            self.status_bar.showMessage(
-                "Ascend did not shut down cleanly last time - see Diagnostics for details."
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(
+                400,
+                lambda: Toast.show_in(
+                    self,
+                    "Ascend did not shut down cleanly last time - see Diagnostics for details.",
+                    tone="warning",
+                ),
             )
-        else:
-            self.status_bar.showMessage("Ready.")
 
     def _restore_geometry(self) -> None:
         geometry = self._settings.value("window/geometry")
@@ -236,8 +244,9 @@ class MainWindow(QMainWindow):
     def _build_pages(self) -> None:
         for key, _label in NAV_ITEMS:
             if key == "dashboard":
-                page = DashboardPage(self.db, self.secure_storage, self.task_manager)
+                page = DashboardPage(self.db, self.secure_storage, self.task_manager, is_demo=self.is_demo)
                 page.open_reports_requested.connect(lambda: self.sidebar.select_section("reports"))
+                page.settings_requested.connect(lambda: self.sidebar.select_section("settings"))
             elif key == "characters":
                 page = CharactersPage(self.db)
             elif key == "reports":
@@ -249,7 +258,7 @@ class MainWindow(QMainWindow):
             else:
                 meta = PLACEHOLDER_META.get(key, {})
                 page = PlaceholderPage(
-                    self._nav_labels[key],
+                    FULL_TITLES.get(key, self._nav_labels[key]),
                     meta.get("note", "Coming in a later phase."),
                     phase=meta.get("phase"),
                     planned=meta.get("planned"),
@@ -262,7 +271,6 @@ class MainWindow(QMainWindow):
         index = self._page_indices.get(key)
         if index is not None:
             self.stack.setCurrentIndex(index)
-        self.status_bar.showMessage(f"Viewing {self._nav_labels.get(key, key)}")
         self._settings.setValue("window/last_page", key)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt override signature

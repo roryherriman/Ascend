@@ -196,57 +196,10 @@ class DemoBanner(Banner):
 
 
 # -- Empty states -----------------------------------------------------------
-
-class EmptyStatePanel(QFrame):
-    """Generic 'nothing here yet' panel: icon + title + description, optionally
-    with a phase badge and a list of planned capabilities."""
-
-    def __init__(
-        self,
-        title: str,
-        description: str,
-        icon_name: str | None = None,
-        phase: int | None = None,
-        planned: list[str] | None = None,
-        parent: QWidget | None = None,
-    ):
-        super().__init__(parent)
-        self.setObjectName("emptyStatePanel")
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 32, 32, 32)
-        layout.setSpacing(10)
-        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-
-        if icon_name:
-            icon_label = QLabel()
-            icon_label.setPixmap(icon(icon_name).pixmap(32, 32))
-            layout.addWidget(icon_label)
-
-        header_row = QHBoxLayout()
-        title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 17px; font-weight: 700;")
-        header_row.addWidget(title_label)
-        if phase is not None:
-            header_row.addWidget(make_phase_badge(phase))
-        header_row.addStretch()
-        layout.addLayout(header_row)
-
-        description_label = QLabel(description)
-        description_label.setProperty("class", "muted")
-        description_label.setWordWrap(True)
-        layout.addWidget(description_label)
-
-        if planned:
-            planned_title = QLabel("Planned:")
-            planned_title.setStyleSheet("font-weight: 600; margin-top: 6px;")
-            layout.addWidget(planned_title)
-            for capability in planned:
-                item_label = QLabel(f"•  {capability}")
-                item_label.setProperty("class", "muted")
-                item_label.setWordWrap(True)
-                layout.addWidget(item_label)
-
+#
+# The full AscendEmptyState component (icon, phase badge, planned list, and
+# action buttons) lives in ascend/ui/components.py. PlaceholderPage wraps it
+# with a page title for full-page use by main_window.py.
 
 class PlaceholderPage(QWidget):
     """Full-page designed empty state shown for sections not yet implemented
@@ -262,6 +215,8 @@ class PlaceholderPage(QWidget):
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
+        from ascend.ui.components import AscendEmptyState  # local import: avoids a circular import
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -270,16 +225,28 @@ class PlaceholderPage(QWidget):
         title_label.setObjectName("pageTitle")
         layout.addWidget(title_label)
 
-        panel = EmptyStatePanel(
+        panel = AscendEmptyState(
             title=title,
             description=phase_note,
             icon_name=icon_name,
             phase=phase,
             planned=planned,
+            secondary_action=("View Roadmap", self._open_roadmap),
         )
         panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         layout.addWidget(panel)
         layout.addStretch()
+
+    @staticmethod
+    def _open_roadmap() -> None:
+        from pathlib import Path
+
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        roadmap_path = Path(__file__).resolve().parent.parent.parent / "docs" / "ROADMAP.md"
+        if roadmap_path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(roadmap_path)))
 
 
 # -- Background task panel ---------------------------------------------------

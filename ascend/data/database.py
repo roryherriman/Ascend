@@ -65,14 +65,17 @@ class Database:
         self._conn: sqlite3.Connection | None = None
 
     @classmethod
-    def default_path_instance(cls) -> "Database":
+    def default_path_instance(cls, demo_override: bool | None = None) -> "Database":
+        """``demo_override`` lets a caller (e.g. the ``--demo`` CLI flag) force
+        Demo Mode for one run without persisting it to the bootstrap config."""
         app_data_root = default_app_data_root()
         config = load_bootstrap_config(app_data_root)
         data_dir = Path(config.get("data_dir", str(app_data_root)))
         data_dir.mkdir(parents=True, exist_ok=True)
         # Demo Mode uses a completely separate database file so demo and real
         # data can never mix (see docs/ARCHITECTURE.md - Demo Mode).
-        db_filename = "ascend_demo.db" if config.get("demo_mode") else "ascend.db"
+        is_demo = config.get("demo_mode", False) if demo_override is None else demo_override
+        db_filename = "ascend_demo.db" if is_demo else "ascend.db"
         return cls(data_dir / db_filename)
 
     def initialize(self) -> int:
