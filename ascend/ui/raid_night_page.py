@@ -10,21 +10,26 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from ascend.api.url_parser import build_report_url
 from ascend.data.database import Database
-from ascend.data.models import Report
+from ascend.data.models import Fight, Report
 from ascend.data.repositories import ReportRepository
 from ascend.services.zone_data import label_for_difficulty
 from ascend.theme import PALETTE, apply_card_elevation
@@ -52,6 +57,80 @@ def _format_duration(start: float | None, end: float | None) -> str:
     return f"{minutes}:{seconds:02d}"
 
 
+class PullDetailDialog(QDialog):
+    """Drill-down for a single pull: what we objectively know about it
+    (boss, difficulty, result, timing, participants) plus a direct link to
+    the fight on Warcraft Logs as the evidence - Ascend doesn't yet ingest
+    event-level data (deaths, damage, etc.), so it doesn't fabricate a local
+    evidence panel; the authoritative source is one click away instead."""
+
+    def __init__(
+        self,
+        db: Database,
+        report: Report,
+        fight: Fight,
+        pull_number: int,
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle(f"Pull {pull_number} - {fight.name or 'Unknown Encounter'}")
+        self.setMinimumWidth(420)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        header = QLabel(fight.name or "Unknown Encounter")
+        header.setStyleSheet("font-size: 15px; font-weight: 700;")
+        layout.addWidget(header)
+
+        difficulty_label = label_for_difficulty(db, report.zone_id, fight.difficulty)
+        result = "Kill" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        for caption, value in [
+            ("Pull #", str(pull_number)),
+            ("Difficulty", difficulty_label),
+            ("Result", result),
+            ("Duration", _format_duration(fight.start_time, fight.end_time)),
+        ]:
+            row = QHBoxLayout()
+            caption_label = QLabel(caption)
+            caption_label.setProperty("class", "muted")
+            row.addWidget(caption_label)
+            row.addStretch()
+            value_label = QLabel(value)
+            value_label.setStyleSheet("font-weight: 600;")
+            row.addWidget(value_label)
+            layout.addLayout(row)
+
+        participants_title = QLabel("Participants")
+        participants_title.setStyleSheet("font-size: 12px; font-weight: 600; margin-top: 6px;")
+        layout.addWidget(participants_title)
+
+        reports_repo = ReportRepository(db)
+        participants = reports_repo.participants_for_fight(fight.id) if fight.id else []
+        self.participants_table = QTableWidget(len(participants), 3)
+        self.participants_table.setHorizontalHeaderLabels(["Name", "Server", "Class"])
+        self.participants_table.verticalHeader().setVisible(False)
+        self.participants_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.participants_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        for row, participant in enumerate(sorted(participants, key=lambda p: (p.name or "").lower())):
+            self.participants_table.setItem(row, 0, QTableWidgetItem(participant.name or "--"))
+            self.participants_table.setItem(row, 1, QTableWidgetItem(participant.server or "--"))
+            self.participants_table.setItem(row, 2, QTableWidgetItem(participant.class_name or "--"))
+        layout.addWidget(self.participants_table)
+
+        self.evidence_button = QPushButton("Open This Pull on Warcraft Logs")
+        self.evidence_button.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(build_report_url(report.report_code, fight.fight_id)))
+        )
+        layout.addWidget(self.evidence_button)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+        buttons.button(QDialogButtonBox.StandardButton.Close).clicked.connect(self.accept)
+        layout.addWidget(buttons)
+
+
 class RaidNightSummaryPage(QWidget):
     view_reports_requested = Signal()
 
@@ -60,6 +139,7 @@ class RaidNightSummaryPage(QWidget):
         self.db = db
         self.reports_repo = ReportRepository(db)
         self._reports: list[Report] = []
+        self._current_fights: list[Fight] = []
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(24, 24, 24, 24)
@@ -143,7 +223,13 @@ class RaidNightSummaryPage(QWidget):
         self.pull_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.pull_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.pull_table.setAlternatingRowColors(True)
+        self.pull_table.cellDoubleClicked.connect(self._on_pull_double_clicked)
         layout.addWidget(self.pull_table)
+
+        hint = QLabel("Double-click a pull to view its detail and roster.")
+        hint.setProperty("class", "muted")
+        hint.setStyleSheet("font-size: 10px;")
+        layout.addWidget(hint)
 
         return card
 
@@ -221,12 +307,21 @@ class RaidNightSummaryPage(QWidget):
         report_id = self.report_combo.currentData()
         return next((r for r in self._reports if r.id == report_id), None)
 
+    def _on_pull_double_clicked(self, row: int, _column: int) -> None:
+        report = self._current_report()
+        if report is None or row >= len(self._current_fights):
+            return
+        fight = self._current_fights[row]
+        dialog = PullDetailDialog(self.db, report, fight, pull_number=row + 1, parent=self)
+        dialog.exec()
+
     def _refresh_detail(self) -> None:
         report = self._current_report()
         if report is None:
             return
 
         fights = self.reports_repo.fights_for_report(report.id)
+        self._current_fights = fights
         kills = sum(1 for f in fights if f.kill)
         wipes = sum(1 for f in fights if f.kill is False)
         total_ms = sum(
