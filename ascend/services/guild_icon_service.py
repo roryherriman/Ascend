@@ -19,10 +19,11 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 
 from ascend.data.database import Database, default_app_data_root
 from ascend.data.repositories import GuildIconRepository
+from ascend.ui.styles.tokens import DARK_TOKENS
 
-_BADGE_BACKGROUND = QColor("#25314a")
-_BADGE_BORDER = QColor("#5B8DEF")
-_BADGE_TEXT = QColor("#F1F2F4")
+_BADGE_BACKGROUND = QColor(DARK_TOKENS.palette.accent_muted)
+_BADGE_BORDER = QColor(DARK_TOKENS.palette.accent)
+_BADGE_TEXT = QColor(DARK_TOKENS.palette.text_primary)
 
 
 def guild_cache_key(region: str, realm: str, guild_name: str, guild_id: int | None = None) -> str:
