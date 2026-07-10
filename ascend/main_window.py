@@ -10,7 +10,7 @@ from ascend.data.secure_storage import SecureStorage
 from ascend.navigation import FULL_TITLES, NAV_ITEMS, Sidebar
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.ui.characters_page import CharactersPage, seed_initial_characters
-from ascend.ui.components import Toast
+from ascend.ui.components import ToastOverlay
 from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.diagnostics import DiagnosticsPage
 from ascend.ui.reports_page import ReportsPage
@@ -205,6 +205,11 @@ class MainWindow(QMainWindow):
         self.stack.setObjectName("pageContainer")
         root_layout.addWidget(self.stack, stretch=1)
 
+        # Global toasts (e.g. unclean-shutdown warning) - a dedicated overlay
+        # anchored top-right of the page area, below any per-page context bar,
+        # so it never obscures Dashboard (or any other page's) content.
+        self.toast_overlay = ToastOverlay(self.stack, top_offset=16)
+
         self._page_indices: dict[str, int] = {}
         self._nav_labels = dict(NAV_ITEMS)
         self._build_pages()
@@ -221,8 +226,7 @@ class MainWindow(QMainWindow):
 
             QTimer.singleShot(
                 400,
-                lambda: Toast.show_in(
-                    self,
+                lambda: self.toast_overlay.show_toast(
                     "Ascend did not shut down cleanly last time - see Diagnostics for details.",
                     tone="warning",
                 ),

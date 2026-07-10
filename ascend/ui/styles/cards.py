@@ -111,4 +111,14 @@ QFrame#loadingOverlay {{
     background-color: {p.bg_overlay};
     border-radius: {t.radii.lg}px;
 }}
+
+QFrame#kpiDivider {{
+    background-color: {p.border};
+    border: none;
+    max-width: 1px;
+}}
+
+QFrame#toastCard {{
+    border-radius: {t.radii.md}px;
+}}
 """
