@@ -237,6 +237,11 @@ class ReportRepository:
     def delete_report(self, report_id: int) -> None:
         self.db.execute("DELETE FROM reports WHERE id = ?", (report_id,))
 
+    def update_notes(self, report_id: int, notes: str) -> None:
+        """Manual annotation, never touched by upsert_report - a re-sync of
+        the same report never overwrites a note the user wrote."""
+        self.db.execute("UPDATE reports SET notes = ? WHERE id = ?", (notes, report_id))
+
     def distinct_encounters(self) -> list[tuple[int, str]]:
         """Every (encounter_id, name) pair seen across all synced fights,
         ordered by name - the source list for Encounter Analysis's picker."""
@@ -363,6 +368,7 @@ class ReportRepository:
             end_time=row["end_time"],
             fetched_at=row["fetched_at"],
             analysis_status=row["analysis_status"],
+            notes=(row["notes"] if "notes" in keys else None) or "",
             fight_count=row["fight_count"] if "fight_count" in keys and row["fight_count"] else 0,
             kill_count=row["kill_count"] if "kill_count" in keys and row["kill_count"] else 0,
         )

@@ -94,6 +94,44 @@ def test_select_report_navigates_to_matching_entry(tmp_path, qtbot):
         db.close()
 
 
+def test_notes_load_for_selected_report_and_save_persists(tmp_path, qtbot):
+    db = _make_db(tmp_path)
+    try:
+        reports_repo = ReportRepository(db)
+        report = reports_repo.upsert_report(Report(report_code="ABC123", title="Test Night"))
+        reports_repo.update_notes(report.id, "Existing note")
+
+        page = RaidNightSummaryPage(db)
+        qtbot.addWidget(page)
+
+        assert page.notes_edit.toPlainText() == "Existing note"
+
+        page.notes_edit.setPlainText("Updated note")
+        page._on_save_notes()
+
+        reloaded = ReportRepository(db).get_by_code("ABC123")
+        assert reloaded.notes == "Updated note"
+    finally:
+        db.close()
+
+
+def test_resyncing_a_report_does_not_erase_its_notes(tmp_path):
+    db = _make_db(tmp_path)
+    try:
+        reports_repo = ReportRepository(db)
+        report = reports_repo.upsert_report(Report(report_code="ABC123", title="Test Night"))
+        reports_repo.update_notes(report.id, "Do not lose me")
+
+        # Simulate a re-sync: upsert_report is called again for the same code.
+        reports_repo.upsert_report(Report(report_code="ABC123", title="Test Night (updated title)"))
+
+        reloaded = reports_repo.get_by_code("ABC123")
+        assert reloaded.notes == "Do not lose me"
+        assert reloaded.title == "Test Night (updated title)"
+    finally:
+        db.close()
+
+
 def test_pull_detail_dialog_shows_fight_and_participants(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:

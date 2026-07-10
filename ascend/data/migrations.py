@@ -167,6 +167,13 @@ MIGRATIONS: list[Migration] = [
             ON fight_participants(character_id);
         """,
     ),
+    Migration(
+        version=5,
+        description="Phase 2: manual report annotations",
+        sql="""
+        ALTER TABLE reports ADD COLUMN notes TEXT;
+        """,
+    ),
 ]
 
 
