@@ -254,6 +254,38 @@ class ReportRepository:
         )
         return [(row["encounter_id"], row["name"]) for row in rows]
 
+    def participation_counts(self, character_id: int) -> tuple[int, int]:
+        """(eligible_pulls, participated_pulls) - eligible is every fight in
+        every synced report (every logged pull was a chance to attend, per
+        the scoring direction: "Bench status must not be inferred from
+        missing pull participation"), participated is how many of those the
+        character was actually detected in."""
+        eligible_row = self.db.query_one("SELECT COUNT(*) AS n FROM fights")
+        eligible = eligible_row["n"] if eligible_row else 0
+        participated_row = self.db.query_one(
+            "SELECT COUNT(*) AS n FROM fight_participants WHERE character_id = ?",
+            (character_id,),
+        )
+        participated = participated_row["n"] if participated_row else 0
+        return eligible, participated
+
+    def encounters_for_character(self, character_id: int) -> list[tuple[int, str]]:
+        """Every (encounter_id, name) the given tracked character has
+        actually been detected in - the scoring engine's Learning category
+        only considers encounters the character participated in, not the
+        whole raid's encounter list."""
+        rows = self.db.query_all(
+            """
+            SELECT DISTINCT f.encounter_id AS encounter_id, f.name AS name
+            FROM fight_participants fp
+            JOIN fights f ON f.id = fp.fight_id
+            WHERE fp.character_id = ? AND f.encounter_id IS NOT NULL AND f.name IS NOT NULL
+            ORDER BY f.name COLLATE NOCASE
+            """,
+            (character_id,),
+        )
+        return [(row["encounter_id"], row["name"]) for row in rows]
+
     def fights_for_encounter(self, encounter_id: int) -> list[tuple[Report, Fight]]:
         """Every fight of this encounter across all reports, paired with its
         report, ordered chronologically by absolute time (a Fight's

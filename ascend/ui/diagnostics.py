@@ -2,9 +2,14 @@
 
 Never displays secrets: only whether secure credential storage is working and
 which backend it's using (see ascend/data/secure_storage.py).
+
+Developer Tools section (fixture export/import) is only for development use.
+Sanitized fixtures strip credentials, replace player/guild names, and hash
+report codes - see ascend/services/fixture_sanitizer.py for details.
 """
 from __future__ import annotations
 
+import json
 import platform
 import sqlite3
 from pathlib import Path
@@ -13,9 +18,12 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -86,6 +94,8 @@ class DiagnosticsPage(QWidget):
         buttons_layout.addStretch()
 
         layout.addWidget(buttons_row)
+
+        layout.addWidget(self._build_dev_tools_section())
         layout.addStretch()
 
     def _db_schema_version(self) -> int:
@@ -131,3 +141,118 @@ class DiagnosticsPage(QWidget):
         log_dir = Path(self._values["Log directory"])
         log_dir.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_dir)))
+
+    # -- Developer Tools -------------------------------------------------------
+
+    def _build_dev_tools_section(self) -> QGroupBox:
+        group = QGroupBox("Developer Tools — Sanitized API Fixture Export/Import")
+        layout = QVBoxLayout(group)
+        layout.setSpacing(10)
+
+        warning = QLabel(
+            "DEVELOPER ONLY — For building and testing the death-event parser without "
+            "real credentials. Exported fixtures replace player/guild names, hash report "
+            "codes, redact tokens, and shift timestamps. Review the output before sharing. "
+            "Do not use these functions on production data you can't verify."
+        )
+        warning.setWordWrap(True)
+        warning.setStyleSheet("color: #e0a020; font-size: 11px;")
+        layout.addWidget(warning)
+
+        # Export
+        export_group = QWidget()
+        export_layout = QVBoxLayout(export_group)
+        export_layout.setContentsMargins(0, 0, 0, 0)
+        export_layout.setSpacing(6)
+
+        export_label = QLabel("Paste raw Warcraft Logs JSON response to sanitize and export as a fixture file:")
+        export_label.setWordWrap(True)
+        export_layout.addWidget(export_label)
+
+        endpoint_row = QHBoxLayout()
+        endpoint_lbl = QLabel("Source endpoint:")
+        endpoint_lbl.setFixedWidth(130)
+        endpoint_row.addWidget(endpoint_lbl)
+        self._endpoint_input = QLineEdit()
+        self._endpoint_input.setPlaceholderText("e.g. reportData.report.events")
+        endpoint_row.addWidget(self._endpoint_input)
+        export_layout.addLayout(endpoint_row)
+
+        self._fixture_input = QLineEdit()
+        self._fixture_input.setPlaceholderText("Paste raw JSON here…")
+        self._fixture_input.setMinimumHeight(36)
+        export_layout.addWidget(self._fixture_input)
+
+        self._export_status = QLabel("")
+        self._export_status.setWordWrap(True)
+        self._export_status.setStyleSheet("font-size: 11px;")
+
+        export_btn = QPushButton("Export Sanitized Fixture…")
+        export_btn.clicked.connect(self._on_export_fixture)
+        export_layout.addWidget(export_btn)
+        export_layout.addWidget(self._export_status)
+        layout.addWidget(export_group)
+
+        # Import
+        import_row = QHBoxLayout()
+        import_btn = QPushButton("Load Fixture for Inspection…")
+        import_btn.clicked.connect(self._on_load_fixture)
+        import_row.addWidget(import_btn)
+        import_row.addStretch()
+        self._import_status = QLabel("")
+        self._import_status.setWordWrap(True)
+        self._import_status.setStyleSheet("font-size: 11px;")
+        import_row.addWidget(self._import_status)
+        layout.addLayout(import_row)
+
+        return group
+
+    def _on_export_fixture(self) -> None:
+        from ascend.services.fixture_sanitizer import export_fixture_json
+
+        raw = self._fixture_input.text().strip()
+        if not raw:
+            self._export_status.setText("Paste a JSON payload into the field above first.")
+            return
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            self._export_status.setText(f"Invalid JSON: {exc}")
+            return
+
+        endpoint = self._endpoint_input.text().strip() or "unknown"
+        fixture_json = export_fixture_json(payload, source_endpoint=endpoint)
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Sanitized Fixture",
+            "ascend_fixture.json",
+            "JSON files (*.json)",
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(fixture_json, encoding="utf-8")
+            self._export_status.setText(f"Saved: {path}")
+        except OSError as exc:
+            self._export_status.setText(f"Save failed: {exc}")
+
+    def _on_load_fixture(self) -> None:
+        from ascend.services.fixture_sanitizer import load_fixture
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Sanitized Fixture",
+            "",
+            "JSON files (*.json)",
+        )
+        if not path:
+            return
+        try:
+            payload = load_fixture(path)
+            keys = list(payload.keys()) if isinstance(payload, dict) else ["(list)"]
+            self._import_status.setText(
+                f"Loaded OK — top-level keys: {', '.join(str(k) for k in keys[:8])}"
+            )
+        except (ValueError, OSError) as exc:
+            self._import_status.setText(f"Load failed: {exc}")

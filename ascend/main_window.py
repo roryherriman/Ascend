@@ -15,6 +15,7 @@ from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.data_quality_page import DataQualityPage
 from ascend.ui.death_review_page import DeathReviewPage
 from ascend.ui.diagnostics import DiagnosticsPage
+from ascend.ui.insights_page import InsightsPage
 from ascend.ui.encounter_page import EncounterAnalysisPage
 from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
@@ -55,16 +56,6 @@ PLACEHOLDER_META: dict[str, dict] = {
             "Reclear performance",
         ],
         icon="encounter_progression",
-    ),
-    "insights": dict(
-        phase=2,
-        note="Insights will surface evidence-based strengths, warnings, and improvement areas.",
-        planned=[
-            "Strength and improvement-area insights",
-            "Every insight links back to its evidence",
-            "Confidence and sample size shown alongside each insight",
-        ],
-        icon="insights",
     ),
     "readiness": dict(
         phase=3,
@@ -220,6 +211,8 @@ class MainWindow(QMainWindow):
                 page = DataQualityPage(self.db)
             elif key == "deaths":
                 page = DeathReviewPage(self.db, self.secure_storage, self.task_manager)
+            elif key == "insights":
+                page = InsightsPage(self.db)
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
