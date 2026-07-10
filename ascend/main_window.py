@@ -192,14 +192,7 @@ class MainWindow(QMainWindow):
         help_menu = mb.addMenu("&Help")
 
         about_action = QAction("About Ascend", self)
-        about_action.triggered.connect(lambda: QMessageBox.about(
-            self,
-            "About Ascend",
-            f"<b>Ascend</b> — {metadata.APP_TAGLINE}<br><br>"
-            f"Version {metadata.APP_VERSION} (build {metadata.BUILD_NUMBER})<br>"
-            f"{metadata.COPYRIGHT}<br><br>"
-            f"{metadata.DISCLAIMER}",
-        ))
+        about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
 
         updates_action = QAction("Check for Updates", self)
@@ -208,6 +201,33 @@ class MainWindow(QMainWindow):
             lambda: QDesktopServices.openUrl(QUrl(f"https://github.com/{metadata.GITHUB_REPO}/releases"))
         )
         help_menu.addAction(updates_action)
+
+    def _show_about(self) -> None:
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {metadata.APP_NAME}")
+        dlg.setMinimumWidth(480)
+        layout = QVBoxLayout(dlg)
+
+        body = QLabel(
+            f"<h2>{metadata.APP_NAME}</h2>"
+            f"<p><i>{metadata.APP_TAGLINE}</i></p>"
+            f"<p>Version {metadata.APP_VERSION} (build {metadata.BUILD_NUMBER})</p>"
+            f"<p>{metadata.COPYRIGHT}</p>"
+            f"<hr>"
+            f"<p style='font-size:11px;color:#999'>{metadata.DISCLAIMER}</p>"
+            f"<p><a href='{metadata.GITHUB_URL}' style='color:#7eb3f5'>{metadata.GITHUB_URL}</a></p>"
+        )
+        body.setWordWrap(True)
+        body.setOpenExternalLinks(True)
+        layout.addWidget(body)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        dlg.exec()
 
     def _open_data_folder(self) -> None:
         from ascend.data.database import default_app_data_root
