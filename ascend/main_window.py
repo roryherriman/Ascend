@@ -15,8 +15,11 @@ from ascend.ui.dashboard_page import DashboardPage
 from ascend.ui.data_quality_page import DataQualityPage
 from ascend.ui.death_review_page import DeathReviewPage
 from ascend.ui.diagnostics import DiagnosticsPage
-from ascend.ui.insights_page import InsightsPage
 from ascend.ui.encounter_page import EncounterAnalysisPage
+from ascend.ui.encounter_progression_page import EncounterProgressionPage
+from ascend.ui.export_page import ExportPage
+from ascend.ui.insights_page import InsightsPage
+from ascend.ui.trends_page import TrendsPage
 from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
 from ascend.ui.roster_page import RosterComparisonPage
@@ -25,18 +28,6 @@ from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 # key -> (development phase, note, planned capabilities, icon name)
 PLACEHOLDER_META: dict[str, dict] = {
-    "trends": dict(
-        phase=3,
-        note="Learning and Trends will track how quickly you correct mistakes across a tier.",
-        planned=[
-            "Pull-range comparisons",
-            "Death-rate trends",
-            "Mechanic correction speed",
-            "DPS consistency",
-            "Defensive usage trends",
-        ],
-        icon="trends",
-    ),
     "raid_night_comparison": dict(
         phase=3,
         note="Raid Night Comparison will let you compare two or more nights side by side.",
@@ -46,16 +37,6 @@ PLACEHOLDER_META: dict[str, dict] = {
             "Category-score deltas",
         ],
         icon="raid_night_comparison",
-    ),
-    "encounter_progression": dict(
-        phase=3,
-        note="Encounter Progression will chart your climb on one boss from first pull to farm.",
-        planned=[
-            "First pull to first kill timeline",
-            "Repeated-failure milestones",
-            "Reclear performance",
-        ],
-        icon="encounter_progression",
     ),
     "readiness": dict(
         phase=3,
@@ -88,12 +69,11 @@ PLACEHOLDER_META: dict[str, dict] = {
         icon="rules",
     ),
     "export": dict(
-        phase=3,
-        note="Export and Discord will let you share a Raid Night Summary outside Ascend.",
+        phase=4,
+        note="Discord Export will let you share a Raid Night Summary to your guild's Discord.",
         planned=[
-            "HTML, CSV, and JSON export",
-            "Discord weekly summary (Phase 4)",
-            "PDF export (Phase 4)",
+            "Discord weekly summary",
+            "PDF export",
         ],
         icon="export",
     ),
@@ -213,6 +193,12 @@ class MainWindow(QMainWindow):
                 page = DeathReviewPage(self.db, self.secure_storage, self.task_manager)
             elif key == "insights":
                 page = InsightsPage(self.db)
+            elif key == "trends":
+                page = TrendsPage(self.db)
+            elif key == "encounter_progression":
+                page = EncounterProgressionPage(self.db)
+            elif key == "export":
+                page = ExportPage(self.db)
             elif key == "settings":
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
