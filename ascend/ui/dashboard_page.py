@@ -125,21 +125,13 @@ class DashboardPage(QWidget):
     # -- Building the three state widgets -------------------------------------
 
     def _build_states(self) -> None:
-        no_data = NoDataState(self.db, self.secure_storage, self.task_manager)
-        no_data.analyze_bar.report_ready.connect(self._on_report_ready)
-        no_data.analyze_bar.analysis_failed.connect(self._on_analysis_failed)
+        no_data = NoDataState(self.db, self.open_reports_requested.emit)
         self._register_state(NO_DATA, no_data)
 
-        imported = ImportedIncompleteState(self.db, self.secure_storage, self.task_manager)
-        imported.analyze_bar.report_ready.connect(self._on_report_ready)
-        imported.analyze_bar.analysis_failed.connect(self._on_analysis_failed)
+        imported = ImportedIncompleteState(self.db, self.open_reports_requested.emit)
         self._register_state(IMPORTED_INCOMPLETE, imported)
 
-        active = ActiveAnalyticsState(
-            self.db, self.secure_storage, self.task_manager, self.open_reports_requested
-        )
-        active.analyze_bar.report_ready.connect(self._on_report_ready)
-        active.analyze_bar.analysis_failed.connect(self._on_analysis_failed)
+        active = ActiveAnalyticsState(self.db, self.open_reports_requested)
         if self.is_demo:
             active.apply_demo_data()
         self._register_state(ACTIVE, active)
@@ -153,14 +145,3 @@ class DashboardPage(QWidget):
         self._state_indices[key] = index
         self._state_widgets[key] = widget
 
-    # -- AnalyzeBar outcomes (shared by all three states' bars) --------------
-
-    def _on_report_ready(self, report) -> None:
-        self.toast_overlay.show_toast(
-            f"Retrieved report {report.title or report.report_code}.", tone="success"
-        )
-        self.refresh_state()
-        self.open_reports_requested.emit()
-
-    def _on_analysis_failed(self, message: str) -> None:
-        self.toast_overlay.show_toast(f"Could not retrieve report: {message}", tone="error")

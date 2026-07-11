@@ -25,12 +25,10 @@ from PySide6.QtWidgets import (
 )
 
 from ascend.data.database import Database
-from ascend.data.repositories import ReportRepository, SettingsRepository
-from ascend.data.secure_storage import SecureStorage
-from ascend.services.background_worker import BackgroundTaskManager
+from ascend.data.repositories import ReportRepository
 from ascend.services.data_quality import DETECTED, character_identity_confidence, small_sample_warnings
 from ascend.theme import PALETTE, apply_card_elevation
-from ascend.ui.components import AnalyzeBar, KPIRow, ProgressionGauge, TrendChartWidget
+from ascend.ui.components import KPIRow, ProgressionGauge, TrendChartWidget
 from ascend.ui.icons import icon
 
 _HERO_MAX_WIDTH = 1000
@@ -74,8 +72,7 @@ class NoDataState(QWidget):
     def __init__(
         self,
         db: Database,
-        secure_storage: SecureStorage,
-        task_manager: BackgroundTaskManager,
+        open_reports_callback,
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -89,8 +86,15 @@ class NoDataState(QWidget):
 
         layout.addLayout(self._build_hero_header())
 
-        self.analyze_bar = AnalyzeBar(db, secure_storage, task_manager, compact=False)
-        layout.addWidget(self.analyze_bar)
+        cta = QPushButton("Open Report Library")
+        cta.setObjectName("primaryButton")
+        cta.setFixedHeight(40)
+        cta.clicked.connect(open_reports_callback)
+        cta_row = QHBoxLayout()
+        cta_row.addStretch()
+        cta_row.addWidget(cta)
+        cta_row.addStretch()
+        layout.addLayout(cta_row)
 
         layout.addLayout(self._build_value_indicators())
         layout.addWidget(self._build_how_it_works())
@@ -277,8 +281,7 @@ class ImportedIncompleteState(QWidget):
     def __init__(
         self,
         db: Database,
-        secure_storage: SecureStorage,
-        task_manager: BackgroundTaskManager,
+        open_reports_callback,
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -313,15 +316,12 @@ class ImportedIncompleteState(QWidget):
 
         actions_row = QHBoxLayout()
         actions_row.setContentsMargins(0, 10, 0, 0)
-        continue_button = QPushButton("Continue Analysis")
+        continue_button = QPushButton("Go to Report Library")
         continue_button.setObjectName("primaryButton")
-        continue_button.clicked.connect(self._focus_analyze_bar)
+        continue_button.clicked.connect(open_reports_callback)
         actions_row.addWidget(continue_button)
         actions_row.addStretch()
         layout.addLayout(actions_row)
-
-        self.analyze_bar = AnalyzeBar(db, secure_storage, task_manager, compact=True)
-        layout.addWidget(self.analyze_bar)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -329,9 +329,6 @@ class ImportedIncompleteState(QWidget):
         outer.addStretch()
 
         self.refresh()
-
-    def _focus_analyze_bar(self) -> None:
-        self.analyze_bar.url_edit.setFocus()
 
     def refresh(self) -> None:
         reports = self.reports_repo.list_all()
@@ -381,8 +378,6 @@ class ActiveAnalyticsState(QWidget):
     def __init__(
         self,
         db: Database,
-        secure_storage: SecureStorage,
-        task_manager: BackgroundTaskManager,
         open_reports_requested,
         parent: QWidget | None = None,
     ):
@@ -397,8 +392,6 @@ class ActiveAnalyticsState(QWidget):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 8, 0, 24)
         layout.setSpacing(16)
-
-        layout.addWidget(self._build_quick_analyze(db, secure_storage, task_manager))
 
         top_row = QHBoxLayout()
         top_row.setSpacing(16)
@@ -431,21 +424,6 @@ class ActiveAnalyticsState(QWidget):
         self._refresh_kpis()
         self._refresh_insights()
         self._refresh_data_quality_banner()
-
-    # -- Level 1: Quick Analyze --------------------------------------------
-
-    def _build_quick_analyze(self, db, secure_storage, task_manager) -> QFrame:
-        card = QFrame()
-        card.setProperty("class", "card")
-        card.setObjectName("quickAnalyzePanel")
-        card.setMaximumHeight(96)
-        card.setStyleSheet(f"QFrame#quickAnalyzePanel {{ border-top: 2px solid {PALETTE.accent}; }}")
-        layout = QHBoxLayout(card)
-        layout.setContentsMargins(14, 10, 14, 10)
-
-        self.analyze_bar = AnalyzeBar(db, secure_storage, task_manager, compact=True)
-        layout.addWidget(self.analyze_bar)
-        return card
 
     # -- Level 1: Progression Profile ---------------------------------------
 
