@@ -1,4 +1,4 @@
-﻿"""Raid Night Summary - brings together everything Ascend knows about one
+"""Raid Night Summary - brings together everything Ascend knows about one
 raid night: overview, pull-by-pull table, and the roster detected in it.
 
 Score/classification and participation/survival breakdowns need the scoring
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -221,13 +222,11 @@ class RaidNightSummaryPage(QWidget):
         self.overview_row = self._build_overview_row()
         detail_layout.addLayout(self.overview_row)
 
-        content_row = QHBoxLayout()
-        content_row.setSpacing(14)
-        content_row.addWidget(self._build_pull_table_panel(), stretch=7)
-        content_row.addWidget(self._build_roster_panel(), stretch=5)
-        detail_layout.addLayout(content_row, stretch=1)
-
-        detail_layout.addWidget(self._build_notes_panel())
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_pull_table_panel(), "Pulls")
+        self._tabs.addTab(self._build_roster_panel(), "Roster")
+        self._tabs.addTab(self._build_notes_panel(), "Notes")
+        detail_layout.addWidget(self._tabs, stretch=1)
 
         self._layout.addWidget(self.detail_container, stretch=1)
 
@@ -305,7 +304,7 @@ class RaidNightSummaryPage(QWidget):
         self, pull_number: int, fight: Fight, report: Report, alt: bool
     ) -> QFrame:
         difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
-        result = "Kill âœ“" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        result = "Kill ✓" if fight.kill else ("Wipe" if fight.kill is False else "--")
 
         row = QFrame()
         bg = PALETTE.bg_card_hover if alt else "transparent"
