@@ -192,11 +192,14 @@ def sync_report_by_code(
                     history_id, "cancelled", reports_processed=1, pulls_processed=i
                 )
                 return None
+            raw_enc_id = fight_raw.get("encounterID")
             fight = Fight(
                 report_id=report.id,
                 fight_id=fight_raw["id"],
                 name=fight_raw.get("name"),
-                encounter_id=fight_raw.get("encounterID"),
+                # WCL uses encounterID=0 for trash fights — normalise to None
+                # so encounter-analysis queries can reliably filter with IS NOT NULL
+                encounter_id=raw_enc_id if raw_enc_id else None,
                 difficulty=fight_raw.get("difficulty"),
                 kill=fight_raw.get("kill"),
                 start_time=fight_raw.get("startTime"),
@@ -206,16 +209,20 @@ def sync_report_by_code(
 
             for actor_id in fight_raw.get("friendlyPlayers") or []:
                 actor = actors_by_id.get(actor_id)
-                if actor is None:
-                    continue
-                matched = match_character(actor.get("name"), actor.get("server"), tracked_characters)
+                # Always record the participant so participation counts are
+                # accurate even when masterData.actors omits the actor entry.
+                matched = match_character(
+                    actor.get("name") if actor else None,
+                    actor.get("server") if actor else None,
+                    tracked_characters,
+                )
                 reports_repo.upsert_fight_participant(
                     FightParticipant(
                         fight_id=fight.id,
                         actor_id=actor_id,
-                        name=actor.get("name"),
-                        server=actor.get("server"),
-                        class_name=actor.get("subType"),
+                        name=actor.get("name") if actor else None,
+                        server=actor.get("server") if actor else None,
+                        class_name=actor.get("subType") if actor else None,
                         character_id=matched.id if matched else None,
                     )
                 )
