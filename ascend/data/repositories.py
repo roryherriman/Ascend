@@ -144,8 +144,8 @@ class ReportRepository:
                 """
                 INSERT INTO reports
                     (report_code, title, owner_name, guild_name, zone_id, zone_name,
-                     start_time, end_time, fetched_at, analysis_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     start_time, end_time, fetched_at, analysis_status, report_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     report.report_code,
@@ -158,6 +158,7 @@ class ReportRepository:
                     report.end_time,
                     now,
                     report.analysis_status,
+                    report.report_source,
                 ),
             )
             report.id = cur.lastrowid
@@ -429,6 +430,7 @@ class ReportRepository:
             end_time=row["end_time"],
             fetched_at=row["fetched_at"],
             analysis_status=row["analysis_status"],
+            report_source=(row["report_source"] if "report_source" in keys else None) or "manual",
             notes=(row["notes"] if "notes" in keys else None) or "",
             fight_count=row["fight_count"] if "fight_count" in keys and row["fight_count"] else 0,
             kill_count=row["kill_count"] if "kill_count" in keys and row["kill_count"] else 0,

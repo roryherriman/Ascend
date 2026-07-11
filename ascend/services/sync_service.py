@@ -102,7 +102,7 @@ def sync_new_guild_reports(
                 pass
 
             try:
-                report = sync_report_by_code(_noop, cancel_token, db, client, code)
+                report = sync_report_by_code(_noop, cancel_token, db, client, code, report_source="guild_discovery")
                 if report is not None:
                     new_reports.append(report)
             except ReportCodeNotFoundError:
@@ -125,6 +125,7 @@ def sync_report_by_code(
     db: Database,
     client: WCLClient,
     report_code: str,
+    report_source: str = "manual",
 ) -> Report | None:
     """Fetch a single report by code and upsert it (and its fights) into SQLite.
 
@@ -162,6 +163,7 @@ def sync_report_by_code(
             title=raw.get("title"),
             owner_name=owner.get("name"),
             guild_name=guild.get("name"),
+            report_source=report_source,
             zone_id=zone.get("id"),
             zone_name=zone.get("name"),
             start_time=raw.get("startTime"),

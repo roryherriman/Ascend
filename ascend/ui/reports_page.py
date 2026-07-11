@@ -113,6 +113,10 @@ class _ReportCard(QFrame):
         top.addWidget(zone_date)
         top.addStretch()
 
+        if report.report_source == "guild_discovery":
+            source_badge = make_badge("GUILD SYNC", tone="accent")
+            top.addWidget(source_badge)
+
         status_tone = "success" if report.analysis_status == "analyzed" else "neutral"
         badge = make_badge(report.analysis_status.replace("_", " ").upper(), tone=status_tone)
         top.addWidget(badge)

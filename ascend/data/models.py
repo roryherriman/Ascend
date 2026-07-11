@@ -37,6 +37,7 @@ class Report:
     end_time: float | None = None
     fetched_at: str | None = None
     analysis_status: str = "not_analyzed"
+    report_source: str = "manual"  # "manual" | "guild_discovery"
     notes: str = ""
     id: int | None = None
     fight_count: int = 0
