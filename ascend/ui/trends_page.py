@@ -2,7 +2,6 @@
 
 Shows what is honestly derivable from the data already ingested:
   - Per-encounter kill-rate across pull-range buckets (1-10 / 11-25 / 26-50 / 51+)
-    - This is the "learning curve" view: did the raid improve as pull count grew?
   - Kill rate per raid night (how many kills per night, trending over time)
 
 What requires event data (and therefore isn't shown yet):
@@ -16,16 +15,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QScrollArea,
-    QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -33,12 +28,12 @@ from PySide6.QtWidgets import (
 from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository
 from ascend.services.encounter_classification import classify_pulls, group_by_pull_range
-from ascend.theme import apply_card_elevation
+from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
 
-_BAR_MAX_WIDTH = 160
-_BAR_HEIGHT = 14
+_BAR_MAX_WIDTH = 140
+_BAR_HEIGHT = 12
 
 
 def _format_date(epoch_ms: float | None) -> str:
@@ -50,36 +45,121 @@ def _format_date(epoch_ms: float | None) -> str:
         return "--"
 
 
-def _rate_tone(rate: int) -> str:
+def _rate_color(rate: int) -> str:
     if rate >= 80:
-        return "success"
+        return PALETTE.success
     if rate >= 50:
-        return "info"
-    return "warning"
+        return PALETTE.info
+    return PALETTE.warning
 
 
 class _BarWidget(QWidget):
-    """A simple horizontal proportional fill bar."""
-
-    def __init__(self, fill: float, color: QColor, parent: QWidget | None = None):
+    def __init__(self, fill: float, color: str, parent: QWidget | None = None):
         super().__init__(parent)
         self._fill = max(0.0, min(1.0, fill))
-        self._color = color
+        self._color = QColor(color)
         self.setFixedSize(_BAR_MAX_WIDTH, _BAR_HEIGHT)
 
-    def paintEvent(self, _event) -> None:  # noqa: N802
-        from PySide6.QtGui import QPainter
+    def paintEvent(self, _event) -> None:
         painter = QPainter(self)
-        painter.setRenderHint(painter.RenderHint.Antialiasing)
-        painter.fillRect(0, 0, self.width(), self.height(), QColor("#2a2f3a"))
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillRect(0, 0, self.width(), self.height(), QColor(PALETTE.border))
         filled_w = int(self._fill * self.width())
         if filled_w > 0:
             painter.fillRect(0, 0, filled_w, self.height(), self._color)
         painter.end()
 
 
-BUCKET_COLUMNS = ["Pull Range", "Pulls", "Kills", "Wipes", "Kill Rate", "Trend"]
-RAID_NIGHT_COLUMNS = ["Raid Night", "Encounters Attempted", "Pulls", "Kills", "Kill Rate"]
+def _col_header(texts: list[tuple[str, int]]) -> QFrame:
+    row = QFrame()
+    row.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(8)
+    for text, stretch in texts:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: {PALETTE.text_muted};"
+        )
+        layout.addWidget(lbl, stretch)
+    return row
+
+
+def _bucket_row(group: dict, prev_rate: int | None, alt: bool) -> QFrame:
+    pulls, kills = group["pulls"], group["kills"]
+    wipes = pulls - kills
+    rate = round(100 * kills / pulls) if pulls else 0
+
+    if prev_rate is not None:
+        delta = rate - prev_rate
+        if delta > 0:
+            trend = f"+{delta}% ▲"
+            trend_color = PALETTE.success
+        elif delta < 0:
+            trend = f"{delta}% ▼"
+            trend_color = PALETTE.error if hasattr(PALETTE, "error") else "#c0392b"
+        else:
+            trend = "— no change"
+            trend_color = PALETTE.text_muted
+    else:
+        trend = "baseline"
+        trend_color = PALETTE.text_muted
+
+    row = QFrame()
+    bg = PALETTE.bg_card_hover if alt else "transparent"
+    row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 5, 10, 5)
+    layout.setSpacing(8)
+
+    for text, stretch in [(group["label"], 2), (str(pulls), 1), (str(kills), 1), (str(wipes), 1)]:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(f"font-size: 12px; color: {PALETTE.text_secondary};")
+        layout.addWidget(lbl, stretch)
+
+    rate_lbl = QLabel(f"{rate}%")
+    rate_lbl.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {_rate_color(rate)};")
+    layout.addWidget(rate_lbl, 1)
+
+    bar = _BarWidget(rate / 100, _rate_color(rate))
+    layout.addWidget(bar, 2)
+
+    trend_lbl = QLabel(trend)
+    trend_lbl.setStyleSheet(f"font-size: 11px; color: {trend_color};")
+    layout.addWidget(trend_lbl, 2)
+
+    return row
+
+
+def _night_row(date: str, title: str, enc_count: int, pulls: int, kills: int, alt: bool) -> QFrame:
+    rate = round(100 * kills / pulls) if pulls else 0
+    row = QFrame()
+    bg = PALETTE.bg_card_hover if alt else "transparent"
+    row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 5, 10, 5)
+    layout.setSpacing(8)
+
+    date_lbl = QLabel(date)
+    date_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_muted};")
+    layout.addWidget(date_lbl, 1)
+
+    title_lbl = QLabel(title)
+    title_lbl.setStyleSheet("font-size: 12px; font-weight: 600;")
+    layout.addWidget(title_lbl, 3)
+
+    for text, stretch in [(str(enc_count), 1), (str(pulls), 1), (str(kills), 1)]:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(f"font-size: 12px; color: {PALETTE.text_secondary};")
+        layout.addWidget(lbl, stretch)
+
+    rate_lbl = QLabel(f"{rate}%")
+    rate_lbl.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {_rate_color(rate)};")
+    layout.addWidget(rate_lbl, 1)
+
+    return row
 
 
 class TrendsPage(QWidget):
@@ -160,59 +240,24 @@ class TrendsPage(QWidget):
             enc_label.setStyleSheet("font-size: 12px; font-weight: 600; margin-top: 6px;")
             cl.addWidget(enc_label)
 
-            table = QTableWidget(len(groups), len(BUCKET_COLUMNS))
-            table.setHorizontalHeaderLabels(BUCKET_COLUMNS)
-            table.verticalHeader().setVisible(False)
-            table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-            table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-            table.setAlternatingRowColors(True)
-            table.setMaximumHeight(36 + 36 * len(groups))
+            bucket_container = QWidget()
+            bucket_layout = QVBoxLayout(bucket_container)
+            bucket_layout.setContentsMargins(0, 0, 0, 0)
+            bucket_layout.setSpacing(0)
+            bucket_layout.addWidget(_col_header([
+                ("Pull Range", 2), ("Pulls", 1), ("Kills", 1), ("Wipes", 1),
+                ("Kill Rate", 1), ("", 2), ("Trend", 2),
+            ]))
 
             prev_rate: int | None = None
-            for row, group in enumerate(groups):
-                pulls, kills = group["pulls"], group["kills"]
-                wipes = pulls - kills
+            for i, group in enumerate(groups):
+                pulls = group["pulls"]
+                kills = group["kills"]
                 rate = round(100 * kills / pulls) if pulls else 0
-
-                if prev_rate is not None:
-                    if rate > prev_rate:
-                        trend = f"+{rate - prev_rate}%  ▲"
-                        trend_color = QColor("#2d8a4e")
-                    elif rate < prev_rate:
-                        trend = f"{rate - prev_rate}%  ▼"
-                        trend_color = QColor("#c0392b")
-                    else:
-                        trend = "— (no change)"
-                        trend_color = QColor("#6b7280")
-                else:
-                    trend = "baseline"
-                    trend_color = QColor("#6b7280")
+                bucket_layout.addWidget(_bucket_row(group, prev_rate, alt=i % 2 == 1))
                 prev_rate = rate
 
-                def cell(text: str) -> QTableWidgetItem:
-                    item = QTableWidgetItem(text)
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    return item
-
-                table.setItem(row, 0, cell(group["label"]))
-                table.setItem(row, 1, cell(str(pulls)))
-                table.setItem(row, 2, cell(str(kills)))
-                table.setItem(row, 3, cell(str(wipes)))
-                table.setItem(row, 4, cell(f"{rate}%"))
-
-                trend_item = QTableWidgetItem(trend)
-                trend_item.setFlags(trend_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                trend_item.setForeground(trend_color)
-                trend_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                table.setItem(row, 5, trend_item)
-
-            cl.addWidget(table)
+            cl.addWidget(bucket_container)
 
         self._body.addWidget(curves_card)
 
@@ -235,34 +280,16 @@ class TrendsPage(QWidget):
 
         night_rows = self._compute_raid_night_kill_rates()
         if night_rows:
-            table = QTableWidget(len(night_rows), len(RAID_NIGHT_COLUMNS))
-            table.setHorizontalHeaderLabels(RAID_NIGHT_COLUMNS)
-            table.verticalHeader().setVisible(False)
-            table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-            for col in range(1, len(RAID_NIGHT_COLUMNS)):
-                table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-            table.setAlternatingRowColors(True)
-            table.setMaximumHeight(36 + 36 * min(len(night_rows), 15))
-
-            for row, (date, title, enc_count, pulls, kills) in enumerate(night_rows):
-                rate = round(100 * kills / pulls) if pulls else 0
-
-                def cell(text: str) -> QTableWidgetItem:
-                    item = QTableWidgetItem(text)
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    return item
-
-                table.setItem(row, 0, cell(f"{date} — {title}"))
-                table.setItem(row, 1, cell(str(enc_count)))
-                table.setItem(row, 2, cell(str(pulls)))
-                table.setItem(row, 3, cell(str(kills)))
-                rate_item = QTableWidgetItem(f"{rate}%")
-                rate_item.setFlags(rate_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                rate_item.setForeground(QColor("#2d8a4e") if rate >= 60 else QColor("#e0a020"))
-                table.setItem(row, 4, rate_item)
-
-            nl.addWidget(table)
+            night_container = QWidget()
+            night_layout = QVBoxLayout(night_container)
+            night_layout.setContentsMargins(0, 0, 0, 0)
+            night_layout.setSpacing(0)
+            night_layout.addWidget(_col_header([
+                ("Date", 1), ("Raid Night", 3), ("Encounters", 1), ("Pulls", 1), ("Kills", 1), ("Kill Rate", 1),
+            ]))
+            for i, (date, title, enc_count, pulls, kills) in enumerate(night_rows):
+                night_layout.addWidget(_night_row(date, title, enc_count, pulls, kills, alt=i % 2 == 1))
+            nl.addWidget(night_container)
         else:
             no_data = QLabel("No raid nights with kill data yet.")
             no_data.setProperty("class", "muted")
@@ -288,7 +315,6 @@ class TrendsPage(QWidget):
         self._body.addWidget(unavail_card)
 
     def _compute_raid_night_kill_rates(self) -> list[tuple[str, str, int, int, int]]:
-        """Returns (date_str, title, encounter_count, total_pulls, total_kills) per report, chronological."""
         reports = self.reports_repo.list_all()
         rows: list[tuple[float, str, str, int, int, int]] = []
         for report in reports:

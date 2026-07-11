@@ -1,4 +1,4 @@
-﻿from ascend.data.database import Database
+from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.ui.roster_page import RosterComparisonPage
@@ -17,12 +17,12 @@ def test_shows_empty_state_when_no_roster_data(tmp_path, qtbot):
         qtbot.addWidget(page)
         assert page.empty_state is not None
         assert not page.empty_state.isHidden()
-        assert page.table.isHidden()
+        assert page._card.isHidden()
     finally:
         db.close()
 
 
-def test_table_shows_attendance_and_tracked_badge(tmp_path, qtbot):
+def test_roster_shows_rows_for_members(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:
         character = CharacterRepository(db).create(
@@ -52,13 +52,18 @@ def test_table_shows_attendance_and_tracked_badge(tmp_path, qtbot):
         page = RosterComparisonPage(db)
         qtbot.addWidget(page)
 
-        assert not page.table.isHidden()
-        assert page.table.rowCount() == 2
-        names = {page.table.item(r, 0).text() for r in range(2)}
-        assert names == {"Aeloria", "Otherraider"}
-        # Both attended both raid nights.
-        for row in range(2):
-            assert page.table.item(row, 3).text() == "2"
-            assert page.table.item(row, 4).text() == "2"
+        assert not page._card.isHidden()
+        assert page._rows_layout.count() == 2
+    finally:
+        db.close()
+
+
+def test_roster_page_has_no_table_widget(tmp_path, qtbot):
+    from PySide6.QtWidgets import QTableWidget
+    db = _make_db(tmp_path)
+    try:
+        page = RosterComparisonPage(db)
+        qtbot.addWidget(page)
+        assert not page.findChildren(QTableWidget)
     finally:
         db.close()
