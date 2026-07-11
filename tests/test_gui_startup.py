@@ -54,14 +54,12 @@ def test_settings_page_persists_values(tmp_path, qtbot, monkeypatch):
 
         settings_page = window.stack.widget(window._page_indices["settings"])
         settings_page.client_id_edit.setText("test-client-id")
-        settings_page.guild_rank_edit.setText("Officer")
         settings_page._on_save()
 
         from ascend.data.repositories import SettingsRepository
 
         repo = SettingsRepository(db)
         assert repo.get("wcl_client_id") == "test-client-id"
-        assert repo.get("guild_us_rank") == "Officer"
     finally:
         db.close()
 

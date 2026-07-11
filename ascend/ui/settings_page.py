@@ -1,4 +1,4 @@
-"""Settings page — credentials, raid context, guild, scoring, cache, data management.
+﻿"""Settings page — credentials, raid context, guild, scoring, cache, data management.
 
 Secrets (WCL client secret, Discord webhook URL) are stored via SecureStorage
 (Windows Credential Manager, or a clearly-flagged encrypted fallback) and are
@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -48,25 +47,6 @@ from ascend.services.guild_icon_service import (
 )
 from ascend.ui.dialogs import show_error, show_info
 from ascend.ui.widgets import BackgroundTaskPanel
-
-DEFAULT_SCORING_WEIGHTS = {
-    "attendance": 15,
-    "survival_and_first_deaths": 20,
-    "mechanic_execution": 20,
-    "damage_and_priority_damage": 15,
-    "consistency": 10,
-    "learning_speed": 10,
-    "utility_and_defensives": 5,
-    "preparation_and_consumables": 5,
-}
-
-DEFAULT_THRESHOLDS = {
-    "standout": 90,
-    "strong": 80,
-    "above_average": 70,
-    "average": 55,
-    "below_average": 40,
-}
 
 
 def _run_connection_test(progress_cb, cancel_token, client_id: str, client_secret: str, timeout: float):
@@ -159,9 +139,6 @@ class SettingsPage(QWidget):
         form_layout.addWidget(self._build_bnet_credentials_group())
         form_layout.addWidget(self._build_raid_context_group())
         form_layout.addWidget(self._build_guild_group())
-        form_layout.addWidget(self._build_scoring_weights_group())
-        form_layout.addWidget(self._build_thresholds_group())
-        form_layout.addWidget(self._build_sample_size_group())
         form_layout.addWidget(self._build_network_group())
         form_layout.addWidget(self._build_discord_group())
         form_layout.addWidget(self._build_theme_group())
@@ -272,12 +249,6 @@ class SettingsPage(QWidget):
         self._tier_sync_label.setWordWrap(True)
         layout.addWidget(self._tier_sync_label)
 
-        self.guild_rank_edit = QLineEdit()
-        self.guild_rank_edit.setPlaceholderText("e.g. 42 (optional)")
-        form = QFormLayout()
-        form.addRow("Guild Rank:", self.guild_rank_edit)
-        layout.addLayout(form)
-
         return group
 
     def _build_guild_group(self) -> QGroupBox:
@@ -362,16 +333,6 @@ class SettingsPage(QWidget):
         note.setWordWrap(True)
         icon_form.addRow("", note)
 
-        self.progression_weight_spin = QDoubleSpinBox()
-        self.progression_weight_spin.setRange(0.0, 10.0)
-        self.progression_weight_spin.setSingleStep(0.1)
-        icon_form.addRow("Progression Weighting:", self.progression_weight_spin)
-
-        self.farm_weight_spin = QDoubleSpinBox()
-        self.farm_weight_spin.setRange(0.0, 10.0)
-        self.farm_weight_spin.setSingleStep(0.1)
-        icon_form.addRow("Farm Weighting:", self.farm_weight_spin)
-
         layout.addLayout(icon_form)
         return group
 
@@ -384,57 +345,6 @@ class SettingsPage(QWidget):
         self._realm_completer.setCaseSensitivity(_Qt.CaseSensitivity.CaseInsensitive)
         self._realm_completer.setFilterMode(_Qt.MatchFlag.MatchContains)
         self.guild_realm_edit.setCompleter(self._realm_completer)
-
-    def _build_scoring_weights_group(self) -> QGroupBox:
-        group = QGroupBox("Scoring Weights (0-100 score composition)")
-        form = QFormLayout(group)
-        self.scoring_weight_spins: dict[str, QSpinBox] = {}
-        labels = {
-            "attendance": "Attendance",
-            "survival_and_first_deaths": "Survival & First Deaths",
-            "mechanic_execution": "Mechanic Execution",
-            "damage_and_priority_damage": "Damage & Priority Damage",
-            "consistency": "Consistency",
-            "learning_speed": "Learning Speed",
-            "utility_and_defensives": "Utility & Defensives",
-            "preparation_and_consumables": "Preparation & Consumables",
-        }
-        for key, label in labels.items():
-            spin = QSpinBox()
-            spin.setRange(0, 100)
-            self.scoring_weight_spins[key] = spin
-            form.addRow(f"{label}:", spin)
-        return group
-
-    def _build_thresholds_group(self) -> QGroupBox:
-        group = QGroupBox("Classification Thresholds (minimum score)")
-        form = QFormLayout(group)
-        self.threshold_spins: dict[str, QSpinBox] = {}
-        labels = {
-            "standout": "Standout",
-            "strong": "Strong",
-            "above_average": "Above Average",
-            "average": "Average",
-            "below_average": "Below Average",
-        }
-        for key, label in labels.items():
-            spin = QSpinBox()
-            spin.setRange(0, 100)
-            self.threshold_spins[key] = spin
-            form.addRow(f"{label}:", spin)
-        return group
-
-    def _build_sample_size_group(self) -> QGroupBox:
-        group = QGroupBox("Minimum Sample Sizes")
-        form = QFormLayout(group)
-        self.min_pulls_spin = QSpinBox()
-        self.min_pulls_spin.setRange(1, 500)
-        form.addRow("Minimum pulls for high confidence:", self.min_pulls_spin)
-
-        self.min_deaths_spin = QSpinBox()
-        self.min_deaths_spin.setRange(1, 500)
-        form.addRow("Minimum deaths for high confidence:", self.min_deaths_spin)
-        return group
 
     def _build_network_group(self) -> QGroupBox:
         group = QGroupBox("Cache && Network")
@@ -608,10 +518,6 @@ class SettingsPage(QWidget):
         zones, cached_at, is_cache = get_zones_for_display(self.db)
         self._populate_tier_combo(zones, cached_at, is_cache)
 
-        self.guild_rank_edit.setText(self.settings_repo.get("guild_us_rank", ""))
-        self.progression_weight_spin.setValue(self.settings_repo.get("progression_weight_multiplier", 1.0))
-        self.farm_weight_spin.setValue(self.settings_repo.get("farm_weight_multiplier", 0.4))
-
         guild = get_guild_summary(self.settings_repo)
         self.guild_name_edit.setText(guild["name"])
         self.guild_realm_edit.setText(guild["realm"])
@@ -620,16 +526,6 @@ class SettingsPage(QWidget):
             self.guild_search_region_combo.setCurrentText(region_val)
         self._refresh_guild_status_display(guild)
 
-        weights = self.settings_repo.get("scoring_weights", DEFAULT_SCORING_WEIGHTS)
-        for key, spin in self.scoring_weight_spins.items():
-            spin.setValue(weights.get(key, DEFAULT_SCORING_WEIGHTS[key]))
-
-        thresholds = self.settings_repo.get("classification_thresholds", DEFAULT_THRESHOLDS)
-        for key, spin in self.threshold_spins.items():
-            spin.setValue(thresholds.get(key, DEFAULT_THRESHOLDS[key]))
-
-        self.min_pulls_spin.setValue(self.settings_repo.get("min_sample_pulls", 10))
-        self.min_deaths_spin.setValue(self.settings_repo.get("min_sample_deaths", 5))
         self.cache_duration_spin.setValue(self.settings_repo.get("cache_duration_minutes", 60))
         self.api_timeout_spin.setValue(self.settings_repo.get("api_timeout_seconds", 15))
         self.discord_webhook_edit.setText(self.secure_storage.get_discord_webhook() or "")
@@ -720,18 +616,6 @@ class SettingsPage(QWidget):
         if matching and matching[0].get("id") is not None:
             self.settings_repo.set("current_tier_zone_id", matching[0]["id"])
 
-        self.settings_repo.set("guild_us_rank", self.guild_rank_edit.text().strip())
-        self.settings_repo.set("progression_weight_multiplier", self.progression_weight_spin.value())
-        self.settings_repo.set("farm_weight_multiplier", self.farm_weight_spin.value())
-
-        self.settings_repo.set(
-            "scoring_weights", {k: s.value() for k, s in self.scoring_weight_spins.items()}
-        )
-        self.settings_repo.set(
-            "classification_thresholds", {k: s.value() for k, s in self.threshold_spins.items()}
-        )
-        self.settings_repo.set("min_sample_pulls", self.min_pulls_spin.value())
-        self.settings_repo.set("min_sample_deaths", self.min_deaths_spin.value())
         self.settings_repo.set("cache_duration_minutes", self.cache_duration_spin.value())
         self.settings_repo.set("api_timeout_seconds", self.api_timeout_spin.value())
         self.secure_storage.set_discord_webhook(self.discord_webhook_edit.text().strip() or None)
