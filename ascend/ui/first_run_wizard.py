@@ -19,9 +19,12 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
+    QFrame,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
     QWizard,
@@ -129,46 +132,119 @@ class CharactersSetupPage(QWizardPage):
     def __init__(self, db: Database):
         super().__init__()
         self.db = db
-        self.setTitle("Add Your Characters")
+        self.setTitle("Your Characters")
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(
-            "Add the characters you play to get started. "
-            "Ascend uses character information to match you in imported Warcraft Logs reports.\n\n"
-            "You can add more characters or edit them any time from the Characters page."
-        ))
 
-        self._char_list_layout = QVBoxLayout()
-        layout.addLayout(self._char_list_layout)
-        self._refresh_char_list(db)
+        intro = QLabel(
+            "Add the characters you play. Ascend matches you automatically in imported "
+            "Warcraft Logs reports — class and spec are detected on first import."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
 
-        add_button = QPushButton("Add a Character")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setMaximumHeight(240)
+        inner = QWidget()
+        self._char_list_layout = QVBoxLayout(inner)
+        self._char_list_layout.setSpacing(6)
+        self._char_list_layout.setContentsMargins(0, 4, 0, 4)
+        scroll.setWidget(inner)
+        layout.addWidget(scroll)
+
+        self._empty_label = QLabel("No characters added yet.")
+        self._empty_label.setStyleSheet("color: #888; font-style: italic;")
+        layout.addWidget(self._empty_label)
+
+        add_button = QPushButton("+ Add a Character")
         add_button.clicked.connect(self._on_add)
         layout.addWidget(add_button)
         layout.addStretch()
 
-    def _refresh_char_list(self, db) -> None:
+        self._refresh_char_list()
+
+    def _refresh_char_list(self) -> None:
         from ascend.data.repositories import CharacterRepository
+        from ascend.ui.class_icons import class_icon_pixmap, class_color
+        from ascend.theme import PALETTE
+
         while self._char_list_layout.count():
             item = self._char_list_layout.takeAt(0)
             if item.widget():
+                item.widget().setParent(None)
                 item.widget().deleteLater()
-        for character in CharacterRepository(db).list_all():
-            label = QLabel(
-                f"  • {character.display_name} "
-                f"({character.character_class or 'Unknown class'}) — "
-                f"{character.server or ''} [{character.region or ''}]"
+
+        characters = CharacterRepository(self.db).list_all()
+        self._empty_label.setVisible(not characters)
+
+        for char in characters:
+            card = QFrame()
+            card.setStyleSheet(
+                f"QFrame {{ background: {PALETTE.bg_card}; border: 1px solid {PALETTE.border}; border-radius: 5px; }}"
             )
-            self._char_list_layout.addWidget(label)
+            row = QHBoxLayout(card)
+            row.setContentsMargins(10, 6, 10, 6)
+            row.setSpacing(10)
+
+            icon_lbl = QLabel()
+            pm = class_icon_pixmap(char.character_class, 24)
+            if not pm.isNull():
+                icon_lbl.setPixmap(pm)
+            icon_lbl.setFixedSize(24, 24)
+            row.addWidget(icon_lbl)
+
+            info = QVBoxLayout()
+            info.setSpacing(1)
+            name_lbl = QLabel(char.display_name)
+            name_lbl.setStyleSheet("font-weight: 600; font-size: 12px;")
+            info.addWidget(name_lbl)
+
+            if char.character_class:
+                color = class_color(char.character_class)
+                cls_lbl = QLabel(char.character_class)
+                cls_lbl.setStyleSheet(f"font-size: 11px; color: {color};")
+            else:
+                cls_lbl = QLabel(f"{char.character_name} · {char.server}-{char.region}")
+                cls_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_muted};")
+            info.addWidget(cls_lbl)
+            row.addLayout(info, stretch=1)
+
+            edit_btn = QPushButton("Edit")
+            edit_btn.setFixedWidth(48)
+            edit_btn.clicked.connect(lambda checked=False, c=char: self._on_edit(c))
+            row.addWidget(edit_btn)
+
+            remove_btn = QPushButton("Remove")
+            remove_btn.setFixedWidth(60)
+            remove_btn.setStyleSheet("color: #e05555;")
+            remove_btn.clicked.connect(lambda checked=False, c=char: self._on_remove(c))
+            row.addWidget(remove_btn)
+
+            self._char_list_layout.addWidget(card)
 
     def _on_add(self) -> None:
         from ascend.data.repositories import CharacterRepository, SettingsRepository
-
         preferred_region = SettingsRepository(self.db).get("preferred_region", "US")
         dialog = CharacterDialog(self, default_region=preferred_region)
         if dialog.exec():
             CharacterRepository(self.db).create(dialog.result_character())
-            self._refresh_char_list(self.db)
+            self._refresh_char_list()
+
+    def _on_edit(self, character) -> None:
+        from ascend.data.repositories import CharacterRepository
+        dialog = CharacterDialog(self, character=character)
+        if dialog.exec():
+            updated = dialog.result_character()
+            updated.id = character.id
+            CharacterRepository(self.db).update(updated)
+            self._refresh_char_list()
+
+    def _on_remove(self, character) -> None:
+        from ascend.data.repositories import CharacterRepository
+        CharacterRepository(self.db).delete(character.id)
+        self._refresh_char_list()
 
 
 # ---------------------------------------------------------------------------
