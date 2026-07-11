@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 from ascend.data.database import Database
 from ascend.data.repositories import SessionOperationRepository
 from ascend.data.secure_storage import SecureStorage
-from ascend.navigation import FULL_TITLES, NAV_ITEMS, Sidebar
+from ascend.navigation import ALL_PAGES, FULL_TITLES, NAV_ITEMS, Sidebar
 from ascend.services.background_worker import BackgroundTaskManager
 from ascend.ui.characters_page import CharactersPage, seed_initial_characters
 from ascend.ui.components import ToastOverlay
@@ -37,50 +37,33 @@ from ascend.ui.raid_night_page import RaidNightSummaryPage
 from ascend.ui.reports_page import ReportsPage
 from ascend.ui.roster_page import RosterComparisonPage
 from ascend.ui.settings_page import SettingsPage
+from ascend.ui.global_context_bar import GlobalContextBar
 from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 PLACEHOLDER_META: dict[str, dict] = {
     "raid_night_comparison": dict(
         note="Raid Night Comparison will let you compare two or more nights side by side.",
-        planned=[
-            "Compare 2+ raid nights at once",
-            "Improved / Declined / Unchanged classification",
-            "Category-score deltas",
-        ],
+        planned=["Compare 2+ raid nights at once", "Category-score deltas"],
         icon="raid_night_comparison",
     ),
     "readiness": dict(
         note="Readiness will evaluate whether your data supports moving to a more competitive environment.",
-        planned=[
-            "Readiness classification with evidence",
-            "Largest performance gaps, not just a score",
-        ],
+        planned=["Readiness classification with evidence", "Largest performance gaps"],
         icon="readiness",
     ),
     "goals": dict(
         note="Goals will let you set measurable targets that update automatically as you analyze reports.",
-        planned=[
-            "Measurable goals with start/target/current value",
-            "Automatic progress updates on new analysis",
-            "Not Started / In Progress / Achieved / Missed status",
-        ],
+        planned=["Measurable goals with automatic progress", "Not Started / In Progress / Achieved / Missed"],
         icon="goals",
     ),
     "rules": dict(
-        note="The Encounter Rules editor will let you configure mechanic rules without touching YAML by hand.",
-        planned=[
-            "Priority targets and avoidable-damage rules",
-            "YAML import/export",
-            "Severity, weight, and confidence per rule",
-        ],
+        note="Encounter Rules let you configure mechanic rules. Available in Settings > Advanced.",
+        planned=["Priority targets and avoidable-damage rules", "YAML import/export"],
         icon="rules",
     ),
     "export": dict(
-        note="Discord Export will let you share a Raid Night Summary to your guild's Discord.",
-        planned=[
-            "Discord weekly summary",
-            "PDF export",
-        ],
+        note="Export options are available from Reports and Raid Night pages, and in Settings > Data & Privacy.",
+        planned=["Discord weekly summary", "PDF export"],
         icon="export",
     ),
 }
@@ -130,9 +113,22 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         root_layout.addWidget(self.sidebar)
 
+        page_area = QWidget()
+        page_area_layout = QVBoxLayout(page_area)
+        page_area_layout.setContentsMargins(0, 0, 0, 0)
+        page_area_layout.setSpacing(0)
+
+        self.global_context_bar = GlobalContextBar(db)
+        self.global_context_bar.settings_requested.connect(
+            lambda: self.sidebar.select_section("settings")
+        )
+        page_area_layout.addWidget(self.global_context_bar)
+
         self.stack = QStackedWidget()
         self.stack.setObjectName("pageContainer")
-        root_layout.addWidget(self.stack, stretch=1)
+        page_area_layout.addWidget(self.stack, stretch=1)
+
+        root_layout.addWidget(page_area, stretch=1)
 
         # Global toasts (e.g. unclean-shutdown warning) - a dedicated overlay
         # anchored top-right of the page area, below any per-page context bar,
@@ -140,7 +136,7 @@ class MainWindow(QMainWindow):
         self.toast_overlay = ToastOverlay(self.stack, top_offset=16)
 
         self._page_indices: dict[str, int] = {}
-        self._nav_labels = dict(NAV_ITEMS)
+        self._nav_labels = dict(ALL_PAGES)
         self._build_pages()
         self._wire_cross_page_navigation()
 
@@ -313,7 +309,7 @@ class MainWindow(QMainWindow):
             self.sidebar.select_section(last_key)
 
     def _build_pages(self) -> None:
-        for key, _label in NAV_ITEMS:
+        for key, _label in ALL_PAGES:
             if key == "dashboard":
                 page = DashboardPage(self.db, self.secure_storage, self.task_manager, is_demo=self.is_demo)
                 page.open_reports_requested.connect(lambda: self.sidebar.select_section("reports"))

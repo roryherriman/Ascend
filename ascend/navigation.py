@@ -1,9 +1,11 @@
-"""Sidebar navigation: compact Ascend mark + grouped section list + footer.
+"""Sidebar navigation: Ascend logo mark + grouped section list + footer.
 
-``NAV_ITEMS`` stays a flat, ordered list of the real selectable sections (the
-source of truth other code and tests rely on); ``NAV_GROUPS`` only controls
-how they're visually grouped with headers in the sidebar. Labels here are
-the short sidebar labels - pages can still show their full title internally.
+``NAV_ITEMS`` is the ordered list of sections shown in the sidebar.
+``HIDDEN_PAGES`` are pages that exist in the page stack (and are reachable
+programmatically) but do not appear in the sidebar nav.
+
+``NAV_GROUPS`` controls visual grouping headers in the sidebar.
+Labels here are the short sidebar labels — pages show their full title internally.
 """
 from __future__ import annotations
 
@@ -23,27 +25,30 @@ from ascend.ui.icons import icon
 
 NAV_ITEMS: list[tuple[str, str]] = [
     ("dashboard", "Dashboard"),
-    ("characters", "Characters"),
     ("reports", "Reports"),
     ("raid_night", "Raid Nights"),
-    ("encounter", "Encounters"),
-    ("deaths", "Death Review"),
+    ("encounter_progression", "Progression"),
     ("roster", "Roster"),
     ("trends", "Trends"),
-    ("raid_night_comparison", "Night Comparison"),
-    ("encounter_progression", "Progression"),
     ("insights", "Insights"),
-    ("readiness", "Readiness"),
-    ("goals", "Goals"),
-    ("rules", "Rules"),
-    ("data_quality", "Data Quality"),
-    ("export", "Export"),
     ("settings", "Settings"),
-    ("diagnostics", "Diagnostics"),
 ]
 
-# Full titles shown inside the page itself (top context bar / page header),
-# since the sidebar label is deliberately shortened for density.
+HIDDEN_PAGES: list[tuple[str, str]] = [
+    ("characters", "Characters"),
+    ("encounter", "Encounter Analysis"),
+    ("deaths", "Death Review"),
+    ("data_quality", "Data Health"),
+    ("export", "Export"),
+    ("diagnostics", "Diagnostics"),
+    ("raid_night_comparison", "Raid Night Comparison"),
+    ("readiness", "Readiness"),
+    ("goals", "Goals"),
+    ("rules", "Encounter Rules"),
+]
+
+ALL_PAGES: list[tuple[str, str]] = NAV_ITEMS + HIDDEN_PAGES
+
 FULL_TITLES: dict[str, str] = {
     "dashboard": "Dashboard",
     "characters": "Characters",
@@ -54,28 +59,22 @@ FULL_TITLES: dict[str, str] = {
     "roster": "Roster Comparison",
     "trends": "Learning and Trends",
     "raid_night_comparison": "Raid Night Comparison",
-    "encounter_progression": "Encounter Progression",
+    "encounter_progression": "Progression",
     "insights": "Insights",
     "readiness": "Readiness",
     "goals": "Goals",
     "rules": "Encounter Rules",
-    "data_quality": "Data Quality",
-    "export": "Export and Discord",
+    "data_quality": "Data Health",
+    "export": "Export",
     "settings": "Settings",
     "diagnostics": "Diagnostics",
 }
 
 NAV_GROUPS: list[tuple[str, list[str]]] = [
-    ("Overview", ["dashboard", "characters", "reports"]),
-    (
-        "Analysis",
-        [
-            "raid_night", "encounter", "deaths", "roster", "trends",
-            "raid_night_comparison", "encounter_progression",
-        ],
-    ),
-    ("Intelligence", ["insights", "readiness", "goals", "rules"]),
-    ("System", ["data_quality", "export", "settings", "diagnostics"]),
+    ("Overview", ["dashboard"]),
+    ("Raid", ["reports", "raid_night", "encounter_progression"]),
+    ("Analysis", ["roster", "trends", "insights"]),
+    ("System", ["settings"]),
 ]
 
 NAV_ICONS: dict[str, str] = {

@@ -1,3 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#C7C9CE" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-<path d="M4 18.5L11 5l7 13.5" stroke-width="2"/><path d="M7.6 14.5h6.8" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Ascending bars: heights 5, 8, 13, 20 from bottom, each 4px wide with 1px gap -->
+  <rect x="0" y="19" width="4" height="5" rx="0.8" fill="#5B7CFF"/>
+  <rect x="5" y="16" width="4" height="8" rx="0.8" fill="#5B7CFF" opacity="0.85"/>
+  <rect x="10" y="11" width="4" height="13" rx="0.8" fill="#5B7CFF" opacity="0.70"/>
+  <rect x="15" y="4" width="4" height="20" rx="0.8" fill="#5B7CFF" opacity="0.55"/>
+  <!-- Rising trajectory line connecting bar tops -->
+  <polyline points="2,19 7,16 12,11 17,4" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- Endpoint dot -->
+  <circle cx="17" cy="4" r="1.5" fill="#FFFFFF" opacity="0.9"/>
 </svg>
