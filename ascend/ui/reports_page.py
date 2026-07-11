@@ -1,11 +1,9 @@
 """Report Library — card-based view of all synced Warcraft Logs reports.
 
-PR 6 replaces the dense QTableWidget with a scrollable card grid:
-each report card shows title, zone, date, pull stats, and inline
-action buttons (View Raid Night, Open on WCL, Delete).
-
-The toolbar keeps Discover Reports / Add Report Code / task panel.
-A zone filter dropdown + search bar narrow the visible cards.
+Cards are sorted newest-first. Toolbar provides zone filter, source filter
+(All / Manual / Guild Sync), and free-text search. Actions: Discover Reports,
+Add Report Code. Each card shows title, zone, date, pull stats, badges,
+and inline buttons (View Raid Night, Open WCL, Delete).
 """
 from __future__ import annotations
 
@@ -38,6 +36,9 @@ from ascend.ui.styles.tokens import DARK_TOKENS
 from ascend.ui.widgets import BackgroundTaskPanel, make_badge
 
 _ALL_ZONES = "All Zones"
+_ALL_SOURCES = "All Sources"
+_SOURCE_MANUAL = "Manual"
+_SOURCE_GUILD = "Guild Sync"
 
 
 def _format_date(epoch_ms: float | None) -> str:
@@ -195,9 +196,17 @@ class ReportsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
 
+        header_row = QHBoxLayout()
         title = QLabel("Report Library")
         title.setObjectName("pageTitle")
-        layout.addWidget(title)
+        header_row.addWidget(title)
+        header_row.addStretch()
+        self._count_label = QLabel("")
+        self._count_label.setStyleSheet(
+            f"font-size: 11px; color: {DARK_TOKENS.palette.text_muted};"
+        )
+        header_row.addWidget(self._count_label)
+        layout.addLayout(header_row)
 
         # ── Toolbar ───────────────────────────────────────────────────────
         toolbar = QHBoxLayout()
@@ -208,9 +217,15 @@ class ReportsPage(QWidget):
         toolbar.addWidget(self.search_edit, stretch=1)
 
         self.zone_filter = QComboBox()
-        self.zone_filter.setMinimumWidth(180)
+        self.zone_filter.setMinimumWidth(160)
         self.zone_filter.currentTextChanged.connect(self._rebuild_cards)
         toolbar.addWidget(self.zone_filter)
+
+        self.source_filter = QComboBox()
+        self.source_filter.setMinimumWidth(130)
+        self.source_filter.addItems([_ALL_SOURCES, _SOURCE_MANUAL, _SOURCE_GUILD])
+        self.source_filter.currentTextChanged.connect(self._rebuild_cards)
+        toolbar.addWidget(self.source_filter)
 
         self.discover_button = QPushButton("Discover Reports")
         self.discover_button.setToolTip(
@@ -269,9 +284,14 @@ class ReportsPage(QWidget):
     def _filtered_reports(self) -> list[Report]:
         text = self.search_edit.text().strip().lower()
         zone = self.zone_filter.currentText()
-        result = self._reports
+        source = self.source_filter.currentText()
+        result = sorted(self._reports, key=lambda r: r.start_time or 0, reverse=True)
         if zone and zone != _ALL_ZONES:
             result = [r for r in result if (r.zone_name or "") == zone]
+        if source == _SOURCE_MANUAL:
+            result = [r for r in result if r.report_source != "guild_discovery"]
+        elif source == _SOURCE_GUILD:
+            result = [r for r in result if r.report_source == "guild_discovery"]
         if text:
             result = [
                 r for r in result
@@ -292,6 +312,14 @@ class ReportsPage(QWidget):
                 w.deleteLater()
 
         reports = self._filtered_reports()
+        total = len(self._reports)
+        shown = len(reports)
+        if total == 0:
+            self._count_label.setText("")
+        elif shown == total:
+            self._count_label.setText(f"{total} report{'s' if total != 1 else ''}")
+        else:
+            self._count_label.setText(f"{shown} of {total} reports")
 
         if not self._reports:
             self._cards_layout.addWidget(self._empty_state(
