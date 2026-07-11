@@ -203,6 +203,13 @@ MIGRATIONS: list[Migration] = [
                 ) THEN 'completed' ELSE 'not_started' END;
         """,
     ),
+    Migration(
+        version=8,
+        description="PR 7: report_source column for discovery provenance",
+        sql="""
+        ALTER TABLE reports ADD COLUMN report_source TEXT NOT NULL DEFAULT 'manual';
+        """,
+    ),
 ]
 
 

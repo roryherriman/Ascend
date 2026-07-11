@@ -107,7 +107,7 @@ def test_sync_new_guild_reports_syncs_new_codes(tmp_path):
     client.fetch_guild_reports.return_value = _fake_guild_reports_envelope(["new1", "new2"])
 
     synced = []
-    def fake_sync_report_by_code(progress_cb, cancel_token, db_, client_, code):
+    def fake_sync_report_by_code(progress_cb, cancel_token, db_, client_, code, **kwargs):
         r = Report(report_code=code, title=f"Title {code}", start_time=0, end_time=0)
         from ascend.data.repositories import ReportRepository
         return ReportRepository(db_).upsert_report(r)
@@ -139,7 +139,7 @@ def test_sync_new_guild_reports_stops_paging_when_sentinel_found(tmp_path):
     ReportRepository(db).upsert_report(Report(report_code="old2", title="Old2", start_time=0, end_time=0))
     ReportRepository(db).upsert_report(Report(report_code="old3", title="Old3", start_time=0, end_time=0))
 
-    def fake_sync(progress_cb, cancel_token, db_, client_, code):
+    def fake_sync(progress_cb, cancel_token, db_, client_, code, **kwargs):
         r = Report(report_code=code, title=code, start_time=0, end_time=0)
         return ReportRepository(db_).upsert_report(r)
 
@@ -176,7 +176,7 @@ def test_sync_new_guild_reports_skips_failed_individual_reports(tmp_path):
     client = MagicMock()
     client.fetch_guild_reports.return_value = _fake_guild_reports_envelope(["good", "bad"])
 
-    def fake_sync(progress_cb, cancel_token, db_, client_, code):
+    def fake_sync(progress_cb, cancel_token, db_, client_, code, **kwargs):
         if code == "bad":
             raise ReportCodeNotFoundError("Not found")
         r = Report(report_code=code, title=code, start_time=0, end_time=0)
