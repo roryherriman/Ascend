@@ -252,7 +252,7 @@ class ReportRepository:
         rows = self.db.query_all(
             """
             SELECT DISTINCT encounter_id, name FROM fights
-            WHERE encounter_id IS NOT NULL AND name IS NOT NULL
+            WHERE encounter_id IS NOT NULL AND encounter_id > 0 AND name IS NOT NULL
             ORDER BY name COLLATE NOCASE
             """
         )
@@ -276,7 +276,7 @@ class ReportRepository:
             SELECT DISTINCT f.encounter_id, f.name
             FROM fights f
             JOIN reports r ON r.id = f.report_id
-            WHERE f.encounter_id IS NOT NULL AND f.name IS NOT NULL
+            WHERE f.encounter_id IS NOT NULL AND f.encounter_id > 0 AND f.name IS NOT NULL
               AND r.zone_id = ?
             ORDER BY f.name COLLATE NOCASE
             """,
@@ -309,7 +309,7 @@ class ReportRepository:
             SELECT DISTINCT f.encounter_id AS encounter_id, f.name AS name
             FROM fight_participants fp
             JOIN fights f ON f.id = fp.fight_id
-            WHERE fp.character_id = ? AND f.encounter_id IS NOT NULL AND f.name IS NOT NULL
+            WHERE fp.character_id = ? AND f.encounter_id IS NOT NULL AND f.encounter_id > 0 AND f.name IS NOT NULL
             ORDER BY f.name COLLATE NOCASE
             """,
             (character_id,),
