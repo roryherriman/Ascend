@@ -1,8 +1,11 @@
-"""Reports page - searchable report table, report-code entry, and basic retrieval.
+"""Report Library — card-based view of all synced Warcraft Logs reports.
 
-Bulk discovery, multi-report sync, and analysis are added in Phase 2/3; their
-buttons are present (per the full spec) but disabled with a tooltip explaining
-when they arrive, rather than faking functionality that isn't built yet.
+PR 6 replaces the dense QTableWidget with a scrollable card grid:
+each report card shows title, zone, date, pull stats, and inline
+action buttons (View Raid Night, Open on WCL, Delete).
+
+The toolbar keeps Discover Reports / Add Report Code / task panel.
+A zone filter dropdown + search bar narrow the visible cards.
 """
 from __future__ import annotations
 
@@ -11,16 +14,15 @@ from datetime import datetime, timezone
 from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QAbstractItemView,
+    QComboBox,
+    QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
-    QLineEdit,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
+    QLineEdit,
 )
 
 from ascend.api.client import WCLClient
@@ -32,22 +34,140 @@ from ascend.services.background_worker import BackgroundTaskManager
 from ascend.services.sync_service import sync_new_guild_reports, sync_report_by_code
 from ascend.services.zone_data import label_for_difficulty
 from ascend.ui.dialogs import ReportCodeDialog, confirm, show_error, show_info
+from ascend.ui.styles.tokens import DARK_TOKENS
 from ascend.ui.widgets import BackgroundTaskPanel, make_badge
 
-COLUMNS = [
-    "Title", "Code", "Guild / Owner", "Date", "Encounter(s)", "Difficulty",
-    "Pulls", "Kill / Progression", "Character", "Class", "Analysis Status",
-]
+_ALL_ZONES = "All Zones"
 
 
 def _format_date(epoch_ms: float | None) -> str:
     if not epoch_ms:
         return ""
     try:
-        return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
     except (OSError, OverflowError, ValueError):
         return ""
 
+
+def _pull_stats(fights) -> str:
+    if not fights:
+        return "No pulls"
+    kills = sum(1 for f in fights if f.kill)
+    wipes = sum(1 for f in fights if f.kill is False)
+    parts = [f"{len(fights)} pull{'s' if len(fights) != 1 else ''}"]
+    if kills:
+        parts.append(f"{kills} kill{'s' if kills != 1 else ''}")
+    if wipes:
+        parts.append(f"{wipes} wipe{'s' if wipes != 1 else ''}")
+    return " · ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Report card widget
+# ---------------------------------------------------------------------------
+
+class _ReportCard(QFrame):
+    """Single report entry in the library grid."""
+
+    def __init__(
+        self,
+        report: Report,
+        fights: list,
+        difficulty_label: str,
+        on_view: "Callable[[Report], None]",
+        on_open_wcl: "Callable[[Report], None]",
+        on_delete: "Callable[[Report], None]",
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self.report = report
+        self.setObjectName("reportCard")
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setStyleSheet(f"""
+            #reportCard {{
+                background: {DARK_TOKENS.palette.bg_card};
+                border: 1px solid {DARK_TOKENS.palette.border};
+                border-radius: 6px;
+            }}
+            #reportCard:hover {{
+                border-color: {DARK_TOKENS.palette.accent_muted};
+            }}
+        """)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(14, 10, 14, 10)
+        outer.setSpacing(4)
+
+        # ── Top row: zone · date + status badge ──────────────────────────
+        top = QHBoxLayout()
+        top.setSpacing(6)
+
+        zone_date = QLabel()
+        zone_name = report.zone_name or ""
+        date_str = _format_date(report.start_time)
+        zone_date_parts = [p for p in [zone_name, date_str] if p]
+        zone_date.setText(" · ".join(zone_date_parts) if zone_date_parts else "Unknown zone")
+        zone_date.setStyleSheet(
+            f"font-size: 11px; color: {DARK_TOKENS.palette.text_muted};"
+        )
+        top.addWidget(zone_date)
+        top.addStretch()
+
+        status_tone = "success" if report.analysis_status == "analyzed" else "neutral"
+        badge = make_badge(report.analysis_status.replace("_", " ").upper(), tone=status_tone)
+        top.addWidget(badge)
+        outer.addLayout(top)
+
+        # ── Title ─────────────────────────────────────────────────────────
+        title_text = report.title or report.report_code
+        title = QLabel(title_text)
+        title.setStyleSheet(
+            f"font-size: 13px; font-weight: 600; color: {DARK_TOKENS.palette.text_primary};"
+        )
+        title.setWordWrap(True)
+        outer.addWidget(title)
+
+        # ── Stats row ─────────────────────────────────────────────────────
+        stats_parts = [_pull_stats(fights)]
+        if difficulty_label and difficulty_label != "--":
+            stats_parts.append(difficulty_label)
+        guild_or_owner = report.guild_name or report.owner_name or ""
+        if guild_or_owner:
+            stats_parts.append(guild_or_owner)
+
+        stats = QLabel(" · ".join(stats_parts))
+        stats.setStyleSheet(
+            f"font-size: 11px; color: {DARK_TOKENS.palette.text_secondary};"
+        )
+        outer.addWidget(stats)
+
+        # ── Action buttons ────────────────────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        btn_row.addStretch()
+
+        view_btn = QPushButton("View Raid Night")
+        view_btn.setFixedHeight(26)
+        view_btn.clicked.connect(lambda: on_view(report))
+        btn_row.addWidget(view_btn)
+
+        wcl_btn = QPushButton("Open WCL")
+        wcl_btn.setFixedHeight(26)
+        wcl_btn.clicked.connect(lambda: on_open_wcl(report))
+        btn_row.addWidget(wcl_btn)
+
+        del_btn = QPushButton("Delete")
+        del_btn.setObjectName("dangerButton")
+        del_btn.setFixedHeight(26)
+        del_btn.clicked.connect(lambda: on_delete(report))
+        btn_row.addWidget(del_btn)
+
+        outer.addLayout(btn_row)
+
+
+# ---------------------------------------------------------------------------
+# Reports page
+# ---------------------------------------------------------------------------
 
 class ReportsPage(QWidget):
     view_raid_night_requested = Signal(int)
@@ -66,19 +186,27 @@ class ReportsPage(QWidget):
         self.repo = ReportRepository(db)
         self.settings_repo = SettingsRepository(db)
         self._reports: list[Report] = []
+        self._active_task = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
 
-        title = QLabel("Reports")
+        title = QLabel("Report Library")
         title.setObjectName("pageTitle")
         layout.addWidget(title)
 
+        # ── Toolbar ───────────────────────────────────────────────────────
         toolbar = QHBoxLayout()
+
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search reports...")
-        self.search_edit.textChanged.connect(self._apply_filter)
+        self.search_edit.setPlaceholderText("Search by title, code, or guild…")
+        self.search_edit.textChanged.connect(self._rebuild_cards)
         toolbar.addWidget(self.search_edit, stretch=1)
+
+        self.zone_filter = QComboBox()
+        self.zone_filter.setMinimumWidth(180)
+        self.zone_filter.currentTextChanged.connect(self._rebuild_cards)
+        toolbar.addWidget(self.zone_filter)
 
         self.discover_button = QPushButton("Discover Reports")
         self.discover_button.setToolTip(
@@ -86,155 +214,128 @@ class ReportsPage(QWidget):
         )
         self.discover_button.clicked.connect(self._on_discover)
         toolbar.addWidget(self.discover_button)
-        self._refresh_discover_button()
 
         self.add_code_button = QPushButton("Add Report Code")
         self.add_code_button.setObjectName("primaryButton")
         self.add_code_button.clicked.connect(self._on_add_report_code)
         toolbar.addWidget(self.add_code_button)
 
-        self.sync_selected_button = QPushButton("Sync Selected")
-        self.sync_selected_button.setEnabled(False)
-        self.sync_selected_button.setToolTip("Available in Phase 2 (bulk sync).")
-        toolbar.addWidget(self.sync_selected_button)
-
-        self.sync_all_button = QPushButton("Sync All")
-        self.sync_all_button.setEnabled(False)
-        self.sync_all_button.setToolTip("Available in Phase 2 (bulk sync).")
-        toolbar.addWidget(self.sync_all_button)
-
-        self.analyze_button = QPushButton("Analyze Selected")
-        self.analyze_button.setEnabled(False)
-        self.analyze_button.setToolTip("Available in Phase 2/3 (pull-level analysis).")
-        toolbar.addWidget(self.analyze_button)
-
-        self.view_summary_button = QPushButton("View Raid Night Summary")
-        self.view_summary_button.clicked.connect(self._on_view_raid_night_summary)
-        toolbar.addWidget(self.view_summary_button)
-
-        self.delete_button = QPushButton("Delete Local Data")
-        self.delete_button.setObjectName("dangerButton")
-        self.delete_button.clicked.connect(self._on_delete_local_data)
-        toolbar.addWidget(self.delete_button)
-
-        self.open_wcl_button = QPushButton("Open on Warcraft Logs")
-        self.open_wcl_button.clicked.connect(self._on_open_on_wcl)
-        toolbar.addWidget(self.open_wcl_button)
-
         layout.addLayout(toolbar)
 
-        self.table = QTableWidget(0, len(COLUMNS))
-        self.table.setHorizontalHeaderLabels(COLUMNS)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setAlternatingRowColors(True)
-        self.table.setSortingEnabled(True)
-        layout.addWidget(self.table, stretch=1)
+        # ── Card scroll area ──────────────────────────────────────────────
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
 
+        self._cards_container = QWidget()
+        self._cards_layout = QVBoxLayout(self._cards_container)
+        self._cards_layout.setContentsMargins(0, 8, 0, 8)
+        self._cards_layout.setSpacing(8)
+        self._scroll.setWidget(self._cards_container)
+        layout.addWidget(self._scroll, stretch=1)
+
+        # ── Task panel ────────────────────────────────────────────────────
         self.task_panel = BackgroundTaskPanel()
         self.task_panel.cancel_button.clicked.connect(self._on_cancel_sync)
         layout.addWidget(self.task_panel)
 
-        self._active_task = None
         self.reload()
+
+    # ------------------------------------------------------------------
+    # Data loading
+    # ------------------------------------------------------------------
 
     def reload(self) -> None:
         self._reports = self.repo.list_all()
-        self._populate_table(self._reports)
+        self._refresh_zone_filter()
+        self._refresh_discover_button()
+        self._rebuild_cards()
 
-    def _populate_table(self, reports: list[Report]) -> None:
-        self.table.setSortingEnabled(False)
-        self.table.setRowCount(len(reports))
-        for row, report in enumerate(reports):
+    def _refresh_zone_filter(self) -> None:
+        current = self.zone_filter.currentText()
+        zones = sorted({r.zone_name for r in self._reports if r.zone_name})
+        self.zone_filter.blockSignals(True)
+        self.zone_filter.clear()
+        self.zone_filter.addItem(_ALL_ZONES)
+        self.zone_filter.addItems(zones)
+        if current in zones:
+            self.zone_filter.setCurrentText(current)
+        self.zone_filter.blockSignals(False)
+
+    def _filtered_reports(self) -> list[Report]:
+        text = self.search_edit.text().strip().lower()
+        zone = self.zone_filter.currentText()
+        result = self._reports
+        if zone and zone != _ALL_ZONES:
+            result = [r for r in result if (r.zone_name or "") == zone]
+        if text:
+            result = [
+                r for r in result
+                if text in (r.title or "").lower()
+                or text in r.report_code.lower()
+                or text in (r.guild_name or "").lower()
+                or text in (r.owner_name or "").lower()
+            ]
+        return result
+
+    def _rebuild_cards(self) -> None:
+        # Remove old cards
+        while self._cards_layout.count():
+            item = self._cards_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+        reports = self._filtered_reports()
+
+        if not self._reports:
+            self._cards_layout.addWidget(self._empty_state(
+                "No reports yet",
+                "Use 'Add Report Code' to import a report, or 'Discover Reports' to pull"
+                " all guild reports from Warcraft Logs.",
+            ))
+            self._cards_layout.addStretch()
+            return
+
+        if not reports:
+            self._cards_layout.addWidget(self._empty_state(
+                "No matching reports",
+                "Try a different search term or clear the zone filter.",
+            ))
+            self._cards_layout.addStretch()
+            return
+
+        for report in reports:
             fights = self.repo.fights_for_report(report.id) if report.id else []
-            encounter_names = sorted({f.name for f in fights if f.name})
-            kills = sum(1 for f in fights if f.kill)
-            wipes = sum(1 for f in fights if f.kill is False)
-
             difficulty_labels = sorted({
                 label_for_difficulty(self.db, report.zone_id, f.difficulty)
                 for f in fights if f.difficulty is not None
             } - {"--"})
+            difficulty_label = difficulty_labels[0] if difficulty_labels else ""
 
-            tracked = self.repo.tracked_characters_for_report(report.id) if report.id else []
-            character_text = ", ".join(c.display_name for c in tracked) if tracked else ""
-            class_text = ""
-            if tracked and report.id:
-                participants = [
-                    p for f in fights for p in self.repo.participants_for_fight(f.id)
-                    if p.character_id == tracked[0].id
-                ]
-                classes = sorted({p.class_name for p in participants if p.class_name})
-                class_text = ", ".join(classes)
-
-            values = [
-                report.title or "",
-                report.report_code,
-                report.guild_name or report.owner_name or "",
-                _format_date(report.start_time),
-                ", ".join(encounter_names) if encounter_names else "",
-                ", ".join(difficulty_labels),
-                str(len(fights)),
-                f"{kills} kill / {wipes} wipe" if fights else "",
-                character_text,
-                class_text,
-                "",  # Analysis Status - rendered as a badge widget below
-            ]
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setData(Qt.ItemDataRole.UserRole, report.id)
-                item.setData(Qt.ItemDataRole.UserRole + 1, report.report_code)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.table.setItem(row, col, item)
-
-            status_tone = "success" if report.analysis_status == "analyzed" else "neutral"
-            badge = make_badge(report.analysis_status.replace("_", " ").upper(), tone=status_tone)
-            badge_wrap = QWidget()
-            badge_layout = QHBoxLayout(badge_wrap)
-            badge_layout.setContentsMargins(4, 2, 4, 2)
-            badge_layout.addWidget(badge)
-            badge_layout.addStretch()
-            self.table.setCellWidget(row, len(COLUMNS) - 1, badge_wrap)
-        self.table.setSortingEnabled(True)
-
-    def _apply_filter(self, text: str) -> None:
-        text = text.strip().lower()
-        if not text:
-            self._populate_table(self._reports)
-            return
-        filtered = [
-            r for r in self._reports
-            if text in (r.title or "").lower()
-            or text in r.report_code.lower()
-            or text in (r.guild_name or "").lower()
-            or text in (r.owner_name or "").lower()
-        ]
-        self._populate_table(filtered)
-
-    def _selected_report(self) -> Report | None:
-        row = self.table.currentRow()
-        if row < 0:
-            return None
-        report_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        for report in self._reports:
-            if report.id == report_id:
-                return report
-        return None
-
-    def _build_client(self) -> WCLClient | None:
-        client_id = self.settings_repo.get("wcl_client_id", "")
-        client_secret = self.secure_storage.get_client_secret() or ""
-        timeout = self.settings_repo.get("api_timeout_seconds", 15)
-        if not client_id or not client_secret:
-            show_error(
-                self, "Warcraft Logs credentials not set",
-                "Enter your Warcraft Logs client ID and client secret in Settings first.",
+            card = _ReportCard(
+                report=report,
+                fights=fights,
+                difficulty_label=difficulty_label,
+                on_view=self._on_view_raid_night,
+                on_open_wcl=self._on_open_on_wcl,
+                on_delete=self._on_delete,
             )
-            return None
-        return WCLClient(client_id, client_secret, timeout_seconds=float(timeout))
+            self._cards_layout.addWidget(card)
+
+        self._cards_layout.addStretch()
+
+    def _empty_state(self, heading: str, body: str) -> QLabel:
+        label = QLabel(f"<b>{heading}</b><br><span style='color:{DARK_TOKENS.palette.text_muted}'>{body}</span>")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setWordWrap(True)
+        label.setStyleSheet(f"padding: 40px; color: {DARK_TOKENS.palette.text_secondary};")
+        return label
+
+    # ------------------------------------------------------------------
+    # Discover / guild sync
+    # ------------------------------------------------------------------
 
     def _refresh_discover_button(self) -> None:
         guild_id = self.settings_repo.get("guild_wcl_id", None)
@@ -305,6 +406,10 @@ class ReportsPage(QWidget):
         self.add_code_button.setEnabled(True)
         self.task_panel.finish("Discovery cancelled.")
 
+    # ------------------------------------------------------------------
+    # Add report by code
+    # ------------------------------------------------------------------
+
     def _on_add_report_code(self) -> None:
         dialog = ReportCodeDialog(self)
         if not dialog.exec():
@@ -351,29 +456,41 @@ class ReportsPage(QWidget):
         if self._active_task is not None:
             self._active_task.cancel()
 
-    def _on_delete_local_data(self) -> None:
-        report = self._selected_report()
-        if report is None:
-            show_error(self, "No selection", "Select a report to delete first.")
-            return
-        if confirm(
+    # ------------------------------------------------------------------
+    # Per-card actions
+    # ------------------------------------------------------------------
+
+    def _on_view_raid_night(self, report: Report) -> None:
+        if report.id is not None:
+            self.view_raid_night_requested.emit(report.id)
+
+    def _on_open_on_wcl(self, report: Report) -> None:
+        QDesktopServices.openUrl(
+            QUrl(f"https://www.warcraftlogs.com/reports/{report.report_code}")
+        )
+
+    def _on_delete(self, report: Report) -> None:
+        if not confirm(
             self, "Delete local data",
             f"Delete all locally stored data for report '{report.title or report.report_code}'? "
             "This only removes local data; nothing is changed on Warcraft Logs.",
         ):
-            self.repo.delete_report(report.id)
-            self.reload()
-
-    def _on_view_raid_night_summary(self) -> None:
-        report = self._selected_report()
-        if report is None:
-            show_error(self, "No selection", "Select a report to view its Raid Night Summary first.")
             return
-        self.view_raid_night_requested.emit(report.id)
+        self.repo.delete_report(report.id)
+        self.reload()
 
-    def _on_open_on_wcl(self) -> None:
-        report = self._selected_report()
-        if report is None:
-            show_error(self, "No selection", "Select a report first.")
-            return
-        QDesktopServices.openUrl(QUrl(f"https://www.warcraftlogs.com/reports/{report.report_code}"))
+    # ------------------------------------------------------------------
+    # Shared helpers
+    # ------------------------------------------------------------------
+
+    def _build_client(self) -> WCLClient | None:
+        client_id = self.settings_repo.get("wcl_client_id", "")
+        client_secret = self.secure_storage.get_client_secret() or ""
+        timeout = self.settings_repo.get("api_timeout_seconds", 15)
+        if not client_id or not client_secret:
+            show_error(
+                self, "Warcraft Logs credentials not set",
+                "Enter your Warcraft Logs client ID and client secret in Settings first.",
+            )
+            return None
+        return WCLClient(client_id, client_secret, timeout_seconds=float(timeout))
