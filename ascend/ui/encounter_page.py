@@ -148,8 +148,8 @@ class EncounterAnalysisPage(QWidget):
         alt: bool,
     ) -> QFrame:
         difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
-        result = "Kill âœ“" if fight.kill else ("Wipe" if fight.kill is False else "--")
-        raid_night = f"{_format_date(report.start_time)} â€” {report.title or report.report_code}"
+        result = "Kill ✓" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        raid_night = f"{_format_date(report.start_time)} — {report.title or report.report_code}"
 
         row = QFrame()
         bg = PALETTE.bg_card_hover if alt else "transparent"
