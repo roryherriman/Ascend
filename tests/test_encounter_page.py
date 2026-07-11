@@ -53,11 +53,21 @@ def test_shows_pull_history_and_classification_across_reports(tmp_path, qtbot):
         assert page.encounter_combo.count() == 1
         assert page.encounter_combo.currentText() == "Test Boss"
 
-        assert page.pull_table.rowCount() == 3
-        # Chronological across reports: report1 pull1 (wipe, progression),
-        # report1 pull2 (kill, progression), report2 pull1 (wipe, farm).
-        results = [page.pull_table.item(row, 3).text() for row in range(3)]
-        assert results == ["Wipe", "Kill", "Wipe"]
+        # 3 pull rows in _pulls_layout
+        assert page._pulls_layout.count() == 3
+        # Check result labels: Wipe, Kill ✓, Wipe
+        from PySide6.QtWidgets import QLabel
+        def _result_text(row_idx):
+            w = page._pulls_layout.itemAt(row_idx).widget()
+            labels = w.findChildren(QLabel)
+            for lbl in labels:
+                t = lbl.text()
+                if "Kill" in t or "Wipe" in t:
+                    return t
+            return ""
+        assert "Wipe" in _result_text(0)
+        assert "Kill" in _result_text(1)
+        assert "Wipe" in _result_text(2)
     finally:
         db.close()
 

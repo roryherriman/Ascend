@@ -1,4 +1,4 @@
-"""Raid Night Summary - brings together everything Ascend knows about one
+﻿"""Raid Night Summary - brings together everything Ascend knows about one
 raid night: overview, pull-by-pull table, and the roster detected in it.
 
 Score/classification and participation/survival breakdowns need the scoring
@@ -18,12 +18,11 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QPlainTextEdit,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
+    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -36,9 +35,6 @@ from ascend.services.zone_data import label_for_difficulty
 from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
-
-PULL_COLUMNS = ["Pull #", "Boss", "Difficulty", "Result", "Duration"]
-ROSTER_COLUMNS = ["Name", "Server", "Class", "Tracked"]
 
 
 def _format_date(epoch_ms: float | None) -> str:
@@ -57,6 +53,55 @@ def _format_duration(start: float | None, end: float | None) -> str:
     minutes, seconds = divmod(total_seconds, 60)
     return f"{minutes}:{seconds:02d}"
 
+
+def _row_header(cols: list[tuple[str, int | None]]) -> QFrame:
+    """Styled column-header strip. cols = [(label, stretch_or_fixed_px), ...]"""
+    header = QFrame()
+    header.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(header)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(8)
+    for text, size in cols:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: {PALETTE.text_muted};"
+        )
+        if isinstance(size, int) and size < 10:
+            layout.addWidget(lbl, size)
+        elif isinstance(size, int):
+            lbl.setFixedWidth(size)
+            layout.addWidget(lbl)
+        else:
+            layout.addWidget(lbl, 1)
+    return header
+
+
+def _data_row(values: list[tuple[str, int | None]], *, alt: bool = False) -> QFrame:
+    """Plain data row matching _row_header column layout."""
+    row = QFrame()
+    bg = PALETTE.bg_card_hover if alt else "transparent"
+    row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 5, 10, 5)
+    layout.setSpacing(8)
+    for text, size in values:
+        lbl = QLabel(text)
+        lbl.setStyleSheet("font-size: 12px;")
+        if isinstance(size, int) and size < 10:
+            layout.addWidget(lbl, size)
+        elif isinstance(size, int):
+            lbl.setFixedWidth(size)
+            layout.addWidget(lbl)
+        else:
+            layout.addWidget(lbl, 1)
+    return row
+
+
+# ---------------------------------------------------------------------------
+# Pull Detail Dialog
+# ---------------------------------------------------------------------------
 
 class PullDetailDialog(QDialog):
     """Drill-down for a single pull: what we objectively know about it
@@ -93,13 +138,13 @@ class PullDetailDialog(QDialog):
             ("Duration", _format_duration(fight.start_time, fight.end_time)),
         ]:
             row = QHBoxLayout()
-            caption_label = QLabel(caption)
-            caption_label.setProperty("class", "muted")
-            row.addWidget(caption_label)
+            caption_lbl = QLabel(caption)
+            caption_lbl.setProperty("class", "muted")
+            row.addWidget(caption_lbl)
             row.addStretch()
-            value_label = QLabel(value)
-            value_label.setStyleSheet("font-weight: 600;")
-            row.addWidget(value_label)
+            value_lbl = QLabel(value)
+            value_lbl.setStyleSheet("font-weight: 600;")
+            row.addWidget(value_lbl)
             layout.addLayout(row)
 
         participants_title = QLabel("Participants")
@@ -108,16 +153,18 @@ class PullDetailDialog(QDialog):
 
         reports_repo = ReportRepository(db)
         participants = reports_repo.participants_for_fight(fight.id) if fight.id else []
-        self.participants_table = QTableWidget(len(participants), 3)
-        self.participants_table.setHorizontalHeaderLabels(["Name", "Server", "Class"])
-        self.participants_table.verticalHeader().setVisible(False)
-        self.participants_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.participants_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        for row, participant in enumerate(sorted(participants, key=lambda p: (p.name or "").lower())):
-            self.participants_table.setItem(row, 0, QTableWidgetItem(participant.name or "--"))
-            self.participants_table.setItem(row, 1, QTableWidgetItem(participant.server or "--"))
-            self.participants_table.setItem(row, 2, QTableWidgetItem(participant.class_name or "--"))
-        layout.addWidget(self.participants_table)
+
+        participant_container = QWidget()
+        p_layout = QVBoxLayout(participant_container)
+        p_layout.setContentsMargins(0, 0, 0, 0)
+        p_layout.setSpacing(0)
+        p_layout.addWidget(_row_header([("Name", 3), ("Server", 2), ("Class", 2)]))
+        for i, p in enumerate(sorted(participants, key=lambda x: (x.name or "").lower())):
+            p_layout.addWidget(_data_row(
+                [(p.name or "--", 3), (p.server or "--", 2), (p.class_name or "--", 2)],
+                alt=i % 2 == 1,
+            ))
+        layout.addWidget(participant_container)
 
         self.evidence_button = QPushButton("Open This Pull on Warcraft Logs")
         self.evidence_button.clicked.connect(
@@ -131,6 +178,10 @@ class PullDetailDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.Close).clicked.connect(self.accept)
         layout.addWidget(buttons)
 
+
+# ---------------------------------------------------------------------------
+# Raid Night Summary Page
+# ---------------------------------------------------------------------------
 
 class RaidNightSummaryPage(QWidget):
     view_reports_requested = Signal()
@@ -216,25 +267,84 @@ class RaidNightSummaryPage(QWidget):
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(8)
 
+        header_row = QHBoxLayout()
         title = QLabel("Pulls")
         title.setStyleSheet("font-size: 13px; font-weight: 600;")
-        layout.addWidget(title)
-
-        self.pull_table = QTableWidget(0, len(PULL_COLUMNS))
-        self.pull_table.setHorizontalHeaderLabels(PULL_COLUMNS)
-        self.pull_table.verticalHeader().setVisible(False)
-        self.pull_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.pull_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.pull_table.setAlternatingRowColors(True)
-        self.pull_table.cellDoubleClicked.connect(self._on_pull_double_clicked)
-        layout.addWidget(self.pull_table)
-
-        hint = QLabel("Double-click a pull to view its detail and roster.")
+        header_row.addWidget(title)
+        header_row.addStretch()
+        hint = QLabel("Click a pull to view detail")
         hint.setProperty("class", "muted")
         hint.setStyleSheet("font-size: 10px;")
-        layout.addWidget(hint)
+        header_row.addWidget(hint)
+        layout.addLayout(header_row)
+
+        layout.addWidget(_row_header([("#", 40), ("Boss", 3), ("Difficulty", 2), ("Result", 1), ("Duration", 1)]))
+
+        self._pulls_container = QWidget()
+        self._pulls_layout = QVBoxLayout(self._pulls_container)
+        self._pulls_layout.setContentsMargins(0, 0, 0, 0)
+        self._pulls_layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._pulls_container)
+        layout.addWidget(scroll, stretch=1)
 
         return card
+
+    def _clear_pulls(self) -> None:
+        while self._pulls_layout.count():
+            item = self._pulls_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _build_pull_row(
+        self, pull_number: int, fight: Fight, report: Report, alt: bool
+    ) -> QFrame:
+        difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
+        result = "Kill âœ“" if fight.kill else ("Wipe" if fight.kill is False else "--")
+
+        row = QFrame()
+        bg = PALETTE.bg_card_hover if alt else "transparent"
+        row.setStyleSheet(
+            f"background: {bg}; border-bottom: 1px solid {PALETTE.border};"
+        )
+        row.setCursor(__import__("PySide6.QtCore", fromlist=["Qt"]).Qt.CursorShape.PointingHandCursor)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+
+        num_lbl = QLabel(str(pull_number))
+        num_lbl.setFixedWidth(40)
+        num_lbl.setProperty("class", "muted")
+        layout.addWidget(num_lbl)
+
+        boss_lbl = QLabel(fight.name or "--")
+        boss_lbl.setStyleSheet("font-weight: 600;")
+        layout.addWidget(boss_lbl, 3)
+
+        diff_lbl = QLabel(difficulty_label)
+        diff_lbl.setProperty("class", "muted")
+        layout.addWidget(diff_lbl, 2)
+
+        result_lbl = QLabel(result)
+        if fight.kill:
+            result_lbl.setStyleSheet(f"color: {PALETTE.success}; font-weight: 600;")
+        layout.addWidget(result_lbl, 1)
+
+        dur_lbl = QLabel(_format_duration(fight.start_time, fight.end_time))
+        dur_lbl.setProperty("class", "muted")
+        layout.addWidget(dur_lbl, 1)
+
+        # Capture for lambda closure
+        _fight = fight
+        _pull = pull_number
+        row.mousePressEvent = lambda _ev, f=_fight, p=_pull: self._on_pull_clicked(f, p)
+
+        return row
 
     # -- Roster -----------------------------------------------------------
 
@@ -250,15 +360,54 @@ class RaidNightSummaryPage(QWidget):
         title.setStyleSheet("font-size: 13px; font-weight: 600;")
         layout.addWidget(title)
 
-        self.roster_table = QTableWidget(0, len(ROSTER_COLUMNS))
-        self.roster_table.setHorizontalHeaderLabels(ROSTER_COLUMNS)
-        self.roster_table.verticalHeader().setVisible(False)
-        self.roster_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.roster_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.roster_table.setAlternatingRowColors(True)
-        layout.addWidget(self.roster_table)
+        layout.addWidget(_row_header([("Name", 2), ("Server", 2), ("Class", 2), ("", 1)]))
+
+        self._roster_container = QWidget()
+        self._roster_layout = QVBoxLayout(self._roster_container)
+        self._roster_layout.setContentsMargins(0, 0, 0, 0)
+        self._roster_layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._roster_container)
+        layout.addWidget(scroll, stretch=1)
 
         return card
+
+    def _clear_roster(self) -> None:
+        while self._roster_layout.count():
+            item = self._roster_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _build_roster_row(self, entry: dict, alt: bool) -> QFrame:
+        row = QFrame()
+        bg = PALETTE.bg_card_hover if alt else "transparent"
+        row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(10, 4, 10, 4)
+        layout.setSpacing(8)
+
+        layout.addWidget(QLabel(entry["name"]), 2)
+        srv = QLabel(entry["server"])
+        srv.setProperty("class", "muted")
+        layout.addWidget(srv, 2)
+        cls = QLabel(entry["class_name"])
+        cls.setProperty("class", "muted")
+        layout.addWidget(cls, 2)
+
+        badge_wrap = QWidget()
+        badge_layout = QHBoxLayout(badge_wrap)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        if entry["tracked"]:
+            badge_layout.addWidget(make_badge("TRACKED", tone="accent"))
+        badge_layout.addStretch()
+        layout.addWidget(badge_wrap, 1)
+
+        return row
 
     # -- Notes (manual annotation) -------------------------------------------
 
@@ -315,8 +464,7 @@ class RaidNightSummaryPage(QWidget):
         self._refresh_detail()
 
     def select_report(self, report_id: int) -> None:
-        """External navigation hook, e.g. from Reports page's 'View Raid Night
-        Summary' action."""
+        """External navigation hook, e.g. from Reports page's 'View Raid Night' action."""
         self.reload()
         for i in range(self.report_combo.count()):
             if self.report_combo.itemData(i) == report_id:
@@ -348,12 +496,11 @@ class RaidNightSummaryPage(QWidget):
         report_id = self.report_combo.currentData()
         return next((r for r in self._reports if r.id == report_id), None)
 
-    def _on_pull_double_clicked(self, row: int, _column: int) -> None:
+    def _on_pull_clicked(self, fight: Fight, pull_number: int) -> None:
         report = self._current_report()
-        if report is None or row >= len(self._current_fights):
+        if report is None:
             return
-        fight = self._current_fights[row]
-        dialog = PullDetailDialog(self.db, report, fight, pull_number=row + 1, parent=self)
+        dialog = PullDetailDialog(self.db, report, fight, pull_number=pull_number, parent=self)
         dialog.exec()
 
     def _refresh_detail(self) -> None:
@@ -377,19 +524,9 @@ class RaidNightSummaryPage(QWidget):
         self._overview_labels["duration"].setText(_format_duration(0, total_ms) if fights else "--")
         self.notes_edit.setPlainText(report.notes)
 
-        self.pull_table.setRowCount(len(fights))
-        for row, fight in enumerate(fights):
-            difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
-            result = "Kill" if fight.kill else ("Wipe" if fight.kill is False else "--")
-            values = [
-                str(row + 1),
-                fight.name or "--",
-                difficulty_label,
-                result,
-                _format_duration(fight.start_time, fight.end_time),
-            ]
-            for col, value in enumerate(values):
-                self.pull_table.setItem(row, col, QTableWidgetItem(value))
+        self._clear_pulls()
+        for i, fight in enumerate(fights):
+            self._pulls_layout.addWidget(self._build_pull_row(i + 1, fight, report, alt=i % 2 == 1))
 
         roster: dict[tuple[str, str], dict] = {}
         for fight in fights:
@@ -402,16 +539,8 @@ class RaidNightSummaryPage(QWidget):
                     "tracked": participant.character_id is not None,
                 }
 
-        roster_rows = sorted(roster.values(), key=lambda r: r["name"].lower())
-        self.roster_table.setRowCount(len(roster_rows))
-        for row, entry in enumerate(roster_rows):
-            self.roster_table.setItem(row, 0, QTableWidgetItem(entry["name"]))
-            self.roster_table.setItem(row, 1, QTableWidgetItem(entry["server"]))
-            self.roster_table.setItem(row, 2, QTableWidgetItem(entry["class_name"]))
-            badge_wrap = QWidget()
-            badge_layout = QHBoxLayout(badge_wrap)
-            badge_layout.setContentsMargins(4, 2, 4, 2)
-            if entry["tracked"]:
-                badge_layout.addWidget(make_badge("TRACKED", tone="accent"))
-            badge_layout.addStretch()
-            self.roster_table.setCellWidget(row, 3, badge_wrap)
+        self._clear_roster()
+        for i, entry in enumerate(sorted(roster.values(), key=lambda r: r["name"].lower())):
+            self._roster_layout.addWidget(self._build_roster_row(entry, alt=i % 2 == 1))
+
+

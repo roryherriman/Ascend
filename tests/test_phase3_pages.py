@@ -115,16 +115,23 @@ class TestEncounterProgressionPage:
             _seed_encounter(db, n_wipes=3, with_kill=True, n_farm=2)
             page = EncounterProgressionPage(db)
             # 3 wipes + 1 kill + 2 farm = 6 rows
-            assert page.pull_table.rowCount() == 6
+            assert page._pulls_layout.count() == 6
         finally:
             db.close()
 
     def test_pull_table_phase_column(self, tmp_path):
+        from PySide6.QtWidgets import QLabel
         db = _make_db(tmp_path)
         try:
             _seed_encounter(db, n_wipes=2, with_kill=True, n_farm=1)
             page = EncounterProgressionPage(db)
-            phases = [page.pull_table.item(row, 6).text() for row in range(page.pull_table.rowCount())]
+            phases = []
+            for i in range(page._pulls_layout.count()):
+                w = page._pulls_layout.itemAt(i).widget()
+                for lbl in w.findChildren(QLabel):
+                    if lbl.text() in ("Progression", "Farm"):
+                        phases.append(lbl.text())
+                        break
             assert phases[:3] == ["Progression", "Progression", "Progression"]
             assert phases[3] == "Farm"
         finally:

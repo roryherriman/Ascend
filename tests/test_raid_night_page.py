@@ -63,12 +63,23 @@ def test_shows_detail_with_pulls_and_roster_for_seeded_report(tmp_path, qtbot):
         assert page._overview_labels["pulls"].text() == "1"
         assert page._overview_labels["kills"].text() == "1 / 0"
 
-        assert page.pull_table.rowCount() == 1
-        assert page.pull_table.item(0, 1).text() == "Test Boss"
-        assert page.pull_table.item(0, 3).text() == "Kill"
+        # Pull rows: 1 row in _pulls_layout
+        assert page._pulls_layout.count() == 1
+        from PySide6.QtWidgets import QLabel
+        pull_labels = page._pulls_layout.itemAt(0).widget().findChildren(QLabel)
+        pull_texts = [l.text() for l in pull_labels]
+        assert any("Test Boss" in t for t in pull_texts)
+        assert any("Kill" in t for t in pull_texts)
 
-        assert page.roster_table.rowCount() == 2
-        names = {page.roster_table.item(r, 0).text() for r in range(2)}
+        # Roster rows: 2 entries in _roster_layout
+        assert page._roster_layout.count() == 2
+        names = set()
+        for i in range(page._roster_layout.count()):
+            w = page._roster_layout.itemAt(i).widget()
+            for lbl in w.findChildren(QLabel):
+                t = lbl.text()
+                if t in ("Aeloria", "Otherraider"):
+                    names.add(t)
         assert names == {"Aeloria", "Otherraider"}
     finally:
         db.close()
@@ -153,8 +164,9 @@ def test_pull_detail_dialog_shows_fight_and_participants(tmp_path, qtbot):
         qtbot.addWidget(dialog)
 
         assert "Test Boss" in dialog.windowTitle()
-        assert dialog.participants_table.rowCount() == 1
-        assert dialog.participants_table.item(0, 0).text() == "Aeloria"
+        from PySide6.QtWidgets import QLabel
+        all_labels = [l.text() for l in dialog.findChildren(QLabel)]
+        assert "Aeloria" in all_labels
         assert dialog.evidence_button.text() == "Open This Pull on Warcraft Logs"
     finally:
         db.close()
@@ -183,7 +195,7 @@ def test_double_clicking_a_pull_opens_its_detail_dialog(tmp_path, qtbot, monkeyp
                 opened["executed"] = True
 
         monkeypatch.setattr("ascend.ui.raid_night_page.PullDetailDialog", FakeDialog)
-        page._on_pull_double_clicked(0, 0)
+        page._on_pull_clicked(page._current_fights[0], 1)
 
         assert opened == {"fight_name": "Test Boss", "pull_number": 1, "executed": True}
     finally:
