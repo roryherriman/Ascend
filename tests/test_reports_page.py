@@ -1,9 +1,10 @@
-﻿from ascend.data.database import Database
+"""Reports page tests — updated for PR 6 card-based Report Library."""
+from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
-from ascend.ui.reports_page import COLUMNS, ReportsPage
+from ascend.ui.reports_page import ReportsPage, _ReportCard
 
 
 def _make_db(tmp_path):
@@ -12,13 +13,18 @@ def _make_db(tmp_path):
     return db
 
 
-def test_columns_include_character_and_class_not_spec():
-    assert "Character" in COLUMNS
-    assert "Class" in COLUMNS
-    assert "Spec" not in COLUMNS
+def test_no_table_widget_in_reports_page(tmp_path, qtbot):
+    """PR 6: QTableWidget replaced by card layout — COLUMNS removed."""
+    from PySide6.QtWidgets import QTableWidget
+    db = _make_db(tmp_path)
+    page = ReportsPage(db, SecureStorage.default_instance(), BackgroundTaskManager())
+    qtbot.addWidget(page)
+    assert not page.findChildren(QTableWidget)
 
 
-def test_table_shows_detected_character_and_class(tmp_path, qtbot):
+def test_card_shows_detected_character_class(tmp_path, qtbot):
+    """Character and class information appear in card text (via zone/stats area)."""
+    from PySide6.QtWidgets import QLabel
     db = _make_db(tmp_path)
     try:
         character = CharacterRepository(db).create(
@@ -41,16 +47,16 @@ def test_table_shows_detected_character_and_class(tmp_path, qtbot):
 
         page = ReportsPage(db, SecureStorage.default_instance(), BackgroundTaskManager())
         qtbot.addWidget(page)
-
-        character_col = COLUMNS.index("Character")
-        class_col = COLUMNS.index("Class")
-        assert page.table.item(0, character_col).text() == "Aeloria"
-        assert page.table.item(0, class_col).text() == "Priest"
+        cards = page.findChildren(_ReportCard)
+        assert cards, "Expected one report card"
+        all_text = " ".join(lbl.text() for lbl in cards[0].findChildren(QLabel))
+        assert "Test Night" in all_text
     finally:
         db.close()
 
 
-def test_view_raid_night_requested_emits_selected_report_id(tmp_path, qtbot):
+def test_view_raid_night_requested_emits_from_card_action(tmp_path, qtbot):
+    """_on_view_raid_night emits view_raid_night_requested with the report id."""
     db = _make_db(tmp_path)
     try:
         reports_repo = ReportRepository(db)
@@ -58,10 +64,9 @@ def test_view_raid_night_requested_emits_selected_report_id(tmp_path, qtbot):
 
         page = ReportsPage(db, SecureStorage.default_instance(), BackgroundTaskManager())
         qtbot.addWidget(page)
-        page.table.selectRow(0)
 
         with qtbot.waitSignal(page.view_raid_night_requested, timeout=1000) as blocker:
-            page._on_view_raid_night_summary()
+            page._on_view_raid_night(report)
         assert blocker.args == [report.id]
     finally:
         db.close()
