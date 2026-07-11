@@ -31,6 +31,94 @@ class ReportCodeNotFoundError(Exception):
     pass
 
 
+_GUILD_REPORTS_PER_PAGE = 25
+
+
+def sync_new_guild_reports(
+    progress_callback: Callable[[int, str], None],
+    cancel_token: CancellationToken,
+    db: Database,
+    client: WCLClient,
+    guild_id: int,
+) -> list[Report]:
+    """Discover and sync reports for *guild_id* that are not yet in the local DB.
+
+    Pages through reportData.reports(guildID) newest-first, stopping as soon
+    as a full page arrives with all codes already known (incremental sentinel).
+    Each new report is synced via sync_report_by_code and returned in the
+    list of newly stored Reports.
+
+    Emits progress from 0 → 90 during discovery + per-report sync; 100 at end.
+    Returns an empty list (not an error) when no new reports are found.
+    """
+    reports_repo = ReportRepository(db)
+    history = SyncHistoryRepository(db)
+    history_id = history.start(f"guild_reports:{guild_id}")
+
+    new_reports: list[Report] = []
+    codes_to_sync: list[str] = []
+
+    try:
+        page = 1
+        while True:
+            if cancel_token.is_cancelled:
+                history.finish(history_id, "cancelled")
+                return new_reports
+
+            progress_callback(
+                min(30, page * 5),
+                f"Discovering reports (page {page})…",
+            )
+            envelope = client.fetch_guild_reports(guild_id, page=page, limit=_GUILD_REPORTS_PER_PAGE)
+            page_data: list[dict] = envelope.get("data") or []
+
+            if not page_data:
+                break
+
+            existing_codes = {r.report_code for r in reports_repo.list_all()}
+            new_on_page = [
+                r["code"] for r in page_data
+                if r.get("code") and r["code"] not in existing_codes
+            ]
+            codes_to_sync.extend(new_on_page)
+
+            has_more = envelope.get("has_more_pages", False)
+            if not new_on_page or not has_more:
+                # Either all codes on this page are known (incremental sentinel)
+                # or we've reached the last page — stop paging.
+                break
+            page += 1
+
+        total = len(codes_to_sync)
+        for i, code in enumerate(codes_to_sync):
+            if cancel_token.is_cancelled:
+                history.finish(history_id, "cancelled", reports_processed=len(new_reports))
+                return new_reports
+
+            pct = 30 + int(60 * (i + 1) / max(total, 1))
+            progress_callback(pct, f"Syncing report {i + 1}/{total}: {code}…")
+
+            def _noop(p, m):
+                pass
+
+            try:
+                report = sync_report_by_code(_noop, cancel_token, db, client, code)
+                if report is not None:
+                    new_reports.append(report)
+            except ReportCodeNotFoundError:
+                pass  # skip reports WCL no longer serves
+            except Exception:  # noqa: BLE001
+                pass  # best-effort: continue with remaining reports
+
+        history.finish(history_id, "success", reports_processed=len(new_reports))
+        progress_callback(100, "Done.")
+        return new_reports
+
+    except Exception as exc:
+        history.finish(history_id, "error", error_message=str(exc))
+        raise
+
+
 def sync_report_by_code(
     progress_callback: Callable[[int, str], None],
     cancel_token: CancellationToken,
