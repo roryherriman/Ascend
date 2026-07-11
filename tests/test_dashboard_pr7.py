@@ -1,4 +1,4 @@
-"""PR 7 tests: Dashboard redesign — no QTableWidget, relative demo dates, row-based recent panel."""
+﻿"""PR 7 tests: Dashboard redesign â€” no QTableWidget, relative demo dates, row-based recent panel."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -28,7 +28,7 @@ def _seed_report(db, code="abc", title="Night 1"):
 
 
 # ---------------------------------------------------------------------------
-# ActiveAnalyticsState — no QTableWidget
+# ActiveAnalyticsState â€” no QTableWidget
 # ---------------------------------------------------------------------------
 
 def test_active_state_has_no_table_widget(qtbot, tmp_path):
@@ -39,7 +39,7 @@ def test_active_state_has_no_table_widget(qtbot, tmp_path):
     db = _make_db(tmp_path)
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
     mgr = BackgroundTaskManager()
-    state = ActiveAnalyticsState(db, storage, mgr, _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
     assert not state.findChildren(QTableWidget), "QTableWidget must be removed in PR 7"
 
@@ -51,7 +51,7 @@ def test_active_state_has_raid_nights_layout(qtbot, tmp_path):
     db = _make_db(tmp_path)
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
     mgr = BackgroundTaskManager()
-    state = ActiveAnalyticsState(db, storage, mgr, _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
     assert hasattr(state, "_raid_nights_layout")
 
@@ -111,9 +111,9 @@ def test_refresh_recent_raid_nights_shows_empty_label_when_no_reports(qtbot, tmp
     from ascend.ui.dashboard_states import ActiveAnalyticsState
     db = _make_db(tmp_path)
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
-    state = ActiveAnalyticsState(db, storage, BackgroundTaskManager(), _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
-    # No reports → empty label in _raid_nights_layout
+    # No reports â†’ empty label in _raid_nights_layout
     items = [state._raid_nights_layout.itemAt(i) for i in range(state._raid_nights_layout.count())]
     widgets = [i.widget() for i in items if i and i.widget()]
     assert widgets  # at least the "No raid nights yet." label
@@ -129,7 +129,7 @@ def test_refresh_recent_raid_nights_shows_row_per_report(qtbot, tmp_path):
     _seed_report(db, "a1", "Night 1")
     _seed_report(db, "a2", "Night 2")
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
-    state = ActiveAnalyticsState(db, storage, BackgroundTaskManager(), _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
     # Rows are QFrame children of _raid_nights_layout
     items = [state._raid_nights_layout.itemAt(i) for i in range(state._raid_nights_layout.count())]
@@ -149,7 +149,7 @@ def test_demo_data_dates_are_relative_to_today(qtbot, tmp_path):
     from ascend.ui.dashboard_states import ActiveAnalyticsState
     db = _make_db(tmp_path)
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
-    state = ActiveAnalyticsState(db, storage, BackgroundTaskManager(), _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
     state.apply_demo_data()
 
@@ -173,7 +173,7 @@ def test_demo_data_never_has_future_date(qtbot, tmp_path):
     from datetime import date, timedelta
     db = _make_db(tmp_path)
     storage = SecureStorage(tmp_path, keyring_module=None, dpapi_module=None)
-    state = ActiveAnalyticsState(db, storage, BackgroundTaskManager(), _noop_signal())
+    state = ActiveAnalyticsState(db, _noop_signal())
     qtbot.addWidget(state)
     state.apply_demo_data()
 
@@ -183,7 +183,7 @@ def test_demo_data_never_has_future_date(qtbot, tmp_path):
     for row_w in row_widgets:
         labels = [lbl.text() for lbl in row_w.findChildren(QLabel)]
         for text in labels:
-            # Try to parse as a date — if it looks like "Jul 11", check not future
+            # Try to parse as a date â€” if it looks like "Jul 11", check not future
             try:
                 parsed = datetime.strptime(f"{text} {today.year}", "%b %d %Y").date()
                 assert parsed <= today, f"Demo date {text} is in the future"

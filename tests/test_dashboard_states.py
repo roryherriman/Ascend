@@ -20,9 +20,7 @@ class _DummySignal:
 
 
 def _make_active_state(db, qtbot) -> ActiveAnalyticsState:
-    state = ActiveAnalyticsState(
-        db, SecureStorage.default_instance(), BackgroundTaskManager(), _DummySignal()
-    )
+    state = ActiveAnalyticsState(db, _DummySignal())
     qtbot.addWidget(state)
     return state
 
