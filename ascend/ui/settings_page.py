@@ -139,6 +139,7 @@ class SettingsPage(QWidget):
         form_layout.addWidget(self._build_bnet_credentials_group())
         form_layout.addWidget(self._build_raid_context_group())
         form_layout.addWidget(self._build_guild_group())
+        form_layout.addWidget(self._build_combat_log_group())
         form_layout.addWidget(self._build_network_group())
         form_layout.addWidget(self._build_discord_group())
         form_layout.addWidget(self._build_theme_group())
@@ -345,6 +346,88 @@ class SettingsPage(QWidget):
         self._realm_completer.setCaseSensitivity(_Qt.CaseSensitivity.CaseInsensitive)
         self._realm_completer.setFilterMode(_Qt.MatchFlag.MatchContains)
         self.guild_realm_edit.setCompleter(self._realm_completer)
+
+    def _build_combat_log_group(self) -> QGroupBox:
+        group = QGroupBox("WoW Combat Log")
+        layout = QVBoxLayout(group)
+
+        self._combat_log_status_label = QLabel("Scanning…")
+        self._combat_log_status_label.setWordWrap(True)
+        layout.addWidget(self._combat_log_status_label)
+
+        self._combat_log_path_label = QLabel()
+        self._combat_log_path_label.setProperty("class", "muted")
+        self._combat_log_path_label.setWordWrap(True)
+        self._combat_log_path_label.setStyleSheet("font-size: 11px;")
+        layout.addWidget(self._combat_log_path_label)
+
+        btn_row = QHBoxLayout()
+        rescan_btn = QPushButton("Rescan")
+        rescan_btn.setToolTip("Scan again for WoWCombatLog.txt in common installation paths.")
+        rescan_btn.clicked.connect(self._on_rescan_combat_log)
+        btn_row.addWidget(rescan_btn)
+
+        open_wcl_btn = QPushButton("Open Warcraft Logs Upload")
+        open_wcl_btn.setToolTip(
+            "Opens warcraftlogs.com/upload in your browser so you can upload your combat log. "
+            "Once uploaded, paste the report code into the Reports page."
+        )
+        open_wcl_btn.clicked.connect(self._on_open_wcl_upload)
+        btn_row.addWidget(open_wcl_btn)
+
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        upload_note = QLabel(
+            "Ascend reads report data from Warcraft Logs — it does not parse raw combat logs directly. "
+            "To analyze a raid night: upload WoWCombatLog.txt to warcraftlogs.com, then paste "
+            "the resulting report code into the Reports page."
+        )
+        upload_note.setProperty("class", "muted")
+        upload_note.setWordWrap(True)
+        upload_note.setStyleSheet("font-size: 11px;")
+        layout.addWidget(upload_note)
+
+        self._refresh_combat_log_status()
+        return group
+
+    def _refresh_combat_log_status(self) -> None:
+        from ascend.services.combat_log import detect_combat_logs
+        logs = detect_combat_logs()
+        if not logs:
+            self._combat_log_status_label.setText("No WoW combat log detected.")
+            self._combat_log_path_label.setText(
+                "Searched common installation paths (C:/Program Files (x86)/World of Warcraft, etc.)."
+            )
+            return
+        primary = logs[0]
+        flavor_label = {
+            "_retail_": "Retail",
+            "_classic_era_": "Classic Era",
+            "_classic_": "Classic / Cataclysm",
+        }.get(primary.flavor, primary.flavor)
+        size_text = f"{primary.size_mb():.1f} MB" if primary.size_bytes >= 1024 else f"{primary.size_bytes} B"
+        self._combat_log_status_label.setText(
+            f"Combat log detected ({flavor_label}) — {size_text}, last modified {primary.last_modified_str()}"
+        )
+        self._combat_log_path_label.setText(str(primary.path))
+        if len(logs) > 1:
+            others = ", ".join(
+                f"{l.flavor}" for l in logs[1:]
+            )
+            self._combat_log_path_label.setText(
+                str(primary.path) + f"\n(also found: {others})"
+            )
+
+    def _on_rescan_combat_log(self) -> None:
+        self._combat_log_status_label.setText("Scanning…")
+        self._combat_log_path_label.setText("")
+        self._refresh_combat_log_status()
+
+    def _on_open_wcl_upload(self) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl("https://www.warcraftlogs.com/upload/select-client"))
 
     def _build_network_group(self) -> QGroupBox:
         group = QGroupBox("Cache && Network")
