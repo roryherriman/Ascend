@@ -104,6 +104,36 @@ query RateLimit {
 }
 """
 
+GUILD_REPORTS_QUERY = """
+query GuildReports($guildID: Int!, $limit: Int!, $page: Int!) {
+  reportData {
+    reports(guildID: $guildID, limit: $limit, page: $page) {
+      data {
+        code
+        title
+        startTime
+        endTime
+        zone {
+          id
+          name
+        }
+        owner {
+          name
+        }
+        guild {
+          name
+        }
+      }
+      total
+      per_page
+      current_page
+      last_page
+      has_more_pages
+    }
+  }
+}
+"""
+
 REPORT_BY_CODE_QUERY = """
 query ReportByCode($code: String!) {
   reportData {

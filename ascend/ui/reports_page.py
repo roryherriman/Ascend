@@ -29,7 +29,7 @@ from ascend.data.models import Report
 from ascend.data.repositories import ReportRepository, SettingsRepository
 from ascend.data.secure_storage import SecureStorage
 from ascend.services.background_worker import BackgroundTaskManager
-from ascend.services.sync_service import sync_report_by_code
+from ascend.services.sync_service import sync_new_guild_reports, sync_report_by_code
 from ascend.services.zone_data import label_for_difficulty
 from ascend.ui.dialogs import ReportCodeDialog, confirm, show_error, show_info
 from ascend.ui.widgets import BackgroundTaskPanel, make_badge
@@ -81,9 +81,12 @@ class ReportsPage(QWidget):
         toolbar.addWidget(self.search_edit, stretch=1)
 
         self.discover_button = QPushButton("Discover Reports")
-        self.discover_button.setEnabled(False)
-        self.discover_button.setToolTip("Available in Phase 2 (guild/user report discovery).")
+        self.discover_button.setToolTip(
+            "Fetch all new guild reports from Warcraft Logs not yet in your local library."
+        )
+        self.discover_button.clicked.connect(self._on_discover)
         toolbar.addWidget(self.discover_button)
+        self._refresh_discover_button()
 
         self.add_code_button = QPushButton("Add Report Code")
         self.add_code_button.setObjectName("primaryButton")
@@ -232,6 +235,75 @@ class ReportsPage(QWidget):
             )
             return None
         return WCLClient(client_id, client_secret, timeout_seconds=float(timeout))
+
+    def _refresh_discover_button(self) -> None:
+        guild_id = self.settings_repo.get("guild_wcl_id", None)
+        enabled = bool(guild_id)
+        self.discover_button.setEnabled(enabled)
+        if not enabled:
+            self.discover_button.setToolTip(
+                "Set a guild in Settings to enable automatic report discovery."
+            )
+
+    def _on_discover(self) -> None:
+        guild_id_raw = self.settings_repo.get("guild_wcl_id", None)
+        if not guild_id_raw:
+            show_error(self, "No guild configured", "Set a guild in Settings > Raid Context first.")
+            return
+        try:
+            guild_id = int(guild_id_raw)
+        except (TypeError, ValueError):
+            show_error(self, "Invalid guild ID", "The stored guild ID is not a valid integer.")
+            return
+
+        client = self._build_client()
+        if client is None:
+            return
+
+        self.discover_button.setEnabled(False)
+        self.add_code_button.setEnabled(False)
+        self.task_panel.start("Discovering new guild reports…")
+
+        task = self.task_manager.submit(sync_new_guild_reports, self.db, client, guild_id)
+        self._active_task = task
+        task.signals.progress.connect(self.task_panel.update_progress)
+        task.signals.finished.connect(self._on_discover_finished)
+        task.signals.error.connect(self._on_discover_error)
+        task.signals.cancelled.connect(self._on_discover_cancelled)
+
+    def _on_discover_finished(self, new_reports: list) -> None:
+        self._active_task = None
+        self.discover_button.setEnabled(True)
+        self.add_code_button.setEnabled(True)
+        count = len(new_reports) if new_reports else 0
+        if count == 0:
+            self.task_panel.finish("No new reports found.")
+            show_info(self, "Up to date", "No new reports were found for your guild.")
+        else:
+            self.task_panel.finish(f"Synced {count} new report{'s' if count != 1 else ''}.")
+            self.reload()
+            titles = "\n".join(
+                f"  • {r.title or r.report_code}" for r in (new_reports or [])[:5]
+            )
+            suffix = f"\n  … and {count - 5} more" if count > 5 else ""
+            show_info(
+                self,
+                f"{count} new report{'s' if count != 1 else ''} found",
+                f"The following reports were synced from Warcraft Logs:\n{titles}{suffix}",
+            )
+
+    def _on_discover_error(self, message: str) -> None:
+        self._active_task = None
+        self.discover_button.setEnabled(True)
+        self.add_code_button.setEnabled(True)
+        self.task_panel.reset()
+        show_error(self, "Report discovery failed", message)
+
+    def _on_discover_cancelled(self) -> None:
+        self._active_task = None
+        self.discover_button.setEnabled(True)
+        self.add_code_button.setEnabled(True)
+        self.task_panel.finish("Discovery cancelled.")
 
     def _on_add_report_code(self) -> None:
         dialog = ReportCodeDialog(self)

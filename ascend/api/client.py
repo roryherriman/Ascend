@@ -15,6 +15,7 @@ from ascend.api.auth import OAuthClient, WCLAuthError, WCLNetworkError
 from ascend.api.graphql_queries import (
     DEATH_TABLE_QUERY,
     GUILD_LOOKUP_QUERY,
+    GUILD_REPORTS_QUERY,
     RATE_LIMIT_QUERY,
     REPORT_BY_CODE_QUERY,
     ZONE_DIFFICULTIES_QUERY,
@@ -190,6 +191,23 @@ class WCLClient:
             "faction_id": faction.get("id"),
             "faction_name": faction.get("name", ""),
         }
+
+    def fetch_guild_reports(
+        self, guild_id: int, page: int = 1, limit: int = 25
+    ) -> dict[str, Any]:
+        """Fetch one page of guild reports from reportData.reports(guildID).
+
+        Returns the raw pagination envelope:
+          {data: [{code, title, startTime, endTime, zone, owner, guild}],
+           total, per_page, current_page, last_page, has_more_pages}
+        Raises WCLGraphQLError / WCLNetworkError on failure.
+        """
+        data = self.execute(
+            GUILD_REPORTS_QUERY,
+            {"guildID": guild_id, "limit": limit, "page": page},
+        )
+        reports_data = (data.get("reportData") or {}).get("reports") or {}
+        return reports_data
 
     def fetch_death_table(self, report_code: str, fight_ids: list[int] | None = None) -> Any:
         """Returns Report.table(dataType: Deaths) for the given fights - an
