@@ -20,8 +20,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -706,27 +704,77 @@ class ActiveAnalyticsState(QWidget):
         header_row.addWidget(view_all_button)
         layout.addLayout(header_row)
 
-        self.recent_table = QTableWidget(0, 8)
-        self.recent_table.setHorizontalHeaderLabels(
-            ["Date", "Guild", "Character", "Boss", "Pulls", "Score", "Classification", "Trend"]
-        )
-        self.recent_table.verticalHeader().setVisible(False)
-        self.recent_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        from PySide6.QtWidgets import QHeaderView
-
-        self.recent_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.recent_table.setAlternatingRowColors(True)
-        self.recent_table.setMinimumHeight(170)
-        self.recent_table.cellDoubleClicked.connect(lambda *_a: self.open_reports_requested.emit())
-        layout.addWidget(self.recent_table)
+        self._raid_nights_layout = QVBoxLayout()
+        self._raid_nights_layout.setSpacing(2)
+        layout.addLayout(self._raid_nights_layout)
+        layout.addStretch()
 
         return card
 
+    @staticmethod
+    def _build_raid_night_row(
+        date: str, boss: str, pulls: str, character: str,
+        score: str = "--", classification: str = "--",
+    ) -> QFrame:
+        """Single row in the Recent Raid Nights list."""
+        row = QFrame()
+        row.setObjectName("raidNightRow")
+        row.setStyleSheet(f"""
+            QFrame#raidNightRow {{
+                border-bottom: 1px solid {PALETTE.border};
+                padding: 2px 0;
+            }}
+        """)
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(8)
+
+        date_lbl = QLabel(date)
+        date_lbl.setFixedWidth(70)
+        date_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_muted};")
+        layout.addWidget(date_lbl)
+
+        boss_lbl = QLabel(boss)
+        boss_lbl.setStyleSheet("font-size: 12px; font-weight: 600;")
+        layout.addWidget(boss_lbl, stretch=2)
+
+        char_lbl = QLabel(character)
+        char_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_secondary};")
+        layout.addWidget(char_lbl, stretch=1)
+
+        pulls_lbl = QLabel(f"{pulls} pulls")
+        pulls_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_muted};")
+        layout.addWidget(pulls_lbl)
+
+        if score != "--":
+            score_lbl = QLabel(score)
+            score_lbl.setStyleSheet(f"font-size: 12px; font-weight: 700; color: {PALETTE.success};")
+            layout.addWidget(score_lbl)
+        if classification != "--":
+            cls_lbl = QLabel(classification)
+            cls_lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_muted};")
+            layout.addWidget(cls_lbl)
+
+        return row
+
+    def _clear_raid_nights(self) -> None:
+        while self._raid_nights_layout.count():
+            item = self._raid_nights_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
     def _refresh_recent_raid_nights(self) -> None:
+        self._clear_raid_nights()
         reports = self.reports_repo.list_all()[:5]
-        self.recent_table.setRowCount(len(reports))
-        for row_index, report in enumerate(reports):
+        if not reports:
+            empty = QLabel("No raid nights yet.")
+            empty.setProperty("class", "muted")
+            empty.setStyleSheet("font-size: 11px;")
+            self._raid_nights_layout.addWidget(empty)
+            return
+        for report in reports:
             fights = self.reports_repo.fights_for_report(report.id) if report.id else []
             encounter_names = sorted({f.name for f in fights if f.name})
             boss_text = encounter_names[0] if encounter_names else "--"
@@ -734,18 +782,12 @@ class ActiveAnalyticsState(QWidget):
                 boss_text += f" +{len(encounter_names) - 1}"
             tracked = self.reports_repo.tracked_characters_for_report(report.id) if report.id else []
             character_text = tracked[0].display_name if tracked else "--"
-            values = [
-                _format_date(report.start_time),
-                report.guild_name or report.owner_name or "--",
-                character_text,
-                boss_text,
-                str(len(fights)),
-                "--",
-                "--",
-                "--",
-            ]
-            for col, value in enumerate(values):
-                self.recent_table.setItem(row_index, col, QTableWidgetItem(value))
+            self._raid_nights_layout.addWidget(self._build_raid_night_row(
+                date=_format_date(report.start_time),
+                boss=boss_text,
+                pulls=str(len(fights)),
+                character=character_text,
+            ))
 
     # -- Level 2: Progression Snapshot ----------------------------------------
 
@@ -909,17 +951,25 @@ class ActiveAnalyticsState(QWidget):
                 self._build_insight_row(tone_text, tone, title_text, description_text)
             )
 
+        # Compute demo raid night dates relative to today so they never look stale.
+        from datetime import timedelta
+        today = datetime.now(timezone.utc).date()
+        def _rel(days_ago: int) -> str:
+            return (today - timedelta(days=days_ago)).strftime("%b %d")
+
         demo_rows = [
-            ("Jul 12", "Stellar Ascent", "Aeloria", "Dimensius", "31", "84", "STRONG", "+3.2"),
-            ("Jul 09", "Stellar Ascent", "Aeloria", "Dimensius", "27", "81", "STRONG", "+1.8"),
-            ("Jul 05", "Stellar Ascent", "Thornveil", "Dimensius", "24", "76", "ABOVE AVERAGE", "+4.1"),
-            ("Jul 02", "Stellar Ascent", "Kaelric", "Rasha'nan", "12", "79", "ABOVE AVERAGE", "--"),
-            ("Jun 28", "Stellar Ascent", "Seraphyne", "Rasha'nan", "18", "72", "AVERAGE", "+2.5"),
+            (_rel(0),  "Aeloria",   "Dimensius",  "31", "84", "STRONG"),
+            (_rel(3),  "Aeloria",   "Dimensius",  "27", "81", "STRONG"),
+            (_rel(7),  "Thornveil", "Dimensius",  "24", "76", "ABOVE AVG"),
+            (_rel(10), "Kaelric",   "Rasha'nan",  "12", "79", "ABOVE AVG"),
+            (_rel(14), "Seraphyne", "Rasha'nan",  "18", "72", "AVERAGE"),
         ]
-        self.recent_table.setRowCount(len(demo_rows))
-        for row_index, values in enumerate(demo_rows):
-            for col, value in enumerate(values):
-                self.recent_table.setItem(row_index, col, QTableWidgetItem(value))
+        self._clear_raid_nights()
+        for date, character, boss, pulls, score, classification in demo_rows:
+            self._raid_nights_layout.addWidget(self._build_raid_night_row(
+                date=date, boss=boss, pulls=pulls, character=character,
+                score=score, classification=classification,
+            ))
 
         while self.snapshot_container.count():
             item = self.snapshot_container.takeAt(0)
