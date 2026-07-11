@@ -1,4 +1,4 @@
-"""Encounter Progression - charts the climb on one boss from first pull to farm.
+﻿"""Encounter Progression - charts the climb on one boss from first pull to farm.
 
 Shows the full progression arc for a selected boss: a pull-by-pull visual
 timeline (green = kill, red = wipe), pull-range bucket stats, first-kill
@@ -17,12 +17,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QScrollArea,
     QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -31,7 +28,7 @@ from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository
 from ascend.services.encounter_classification import FARM, classify_pulls, group_by_pull_range
 from ascend.services.zone_data import label_for_difficulty
-from ascend.theme import apply_card_elevation
+from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
 
@@ -99,7 +96,24 @@ class _PullArcWidget(QWidget):
         painter.end()
 
 
-PULL_COLUMNS = ["Pull #", "Date", "Raid Night", "Difficulty", "Result", "Duration", "Phase"]
+_PULL_COLS = [("#", 1), ("Date", 2), ("Raid Night", 3), ("Difficulty", 2), ("Result", 1), ("Duration", 1), ("Phase", 1)]
+
+
+def _pull_header() -> QFrame:
+    header = QFrame()
+    header.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(header)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(8)
+    for text, stretch in _PULL_COLS:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: {PALETTE.text_muted};"
+        )
+        layout.addWidget(lbl, stretch)
+    return header
 
 
 class EncounterProgressionPage(QWidget):
@@ -191,13 +205,18 @@ class EncounterProgressionPage(QWidget):
         history_title.setStyleSheet("font-size: 13px; font-weight: 600;")
         history_layout.addWidget(history_title)
 
-        self.pull_table = QTableWidget(0, len(PULL_COLUMNS))
-        self.pull_table.setHorizontalHeaderLabels(PULL_COLUMNS)
-        self.pull_table.verticalHeader().setVisible(False)
-        self.pull_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.pull_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.pull_table.setAlternatingRowColors(True)
-        history_layout.addWidget(self.pull_table)
+        history_layout.addWidget(_pull_header())
+
+        self._pulls_container = QWidget()
+        self._pulls_layout = QVBoxLayout(self._pulls_container)
+        self._pulls_layout.setContentsMargins(0, 0, 0, 0)
+        self._pulls_layout.setSpacing(0)
+
+        pull_scroll = QScrollArea()
+        pull_scroll.setWidgetResizable(True)
+        pull_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        pull_scroll.setWidget(self._pulls_container)
+        history_layout.addWidget(pull_scroll, stretch=1)
         detail_layout.addWidget(history_card, stretch=1)
 
         self._layout.addWidget(self.detail_widget, stretch=1)
@@ -271,7 +290,7 @@ class EncounterProgressionPage(QWidget):
             )
         else:
             self.milestone_label.setText(
-                f"Still progressing — {len(progression_fights)} pull(s), no kill yet"
+                f"Still progressing â€” {len(progression_fights)} pull(s), no kill yet"
             )
 
         # Stats row badges
@@ -305,28 +324,64 @@ class EncounterProgressionPage(QWidget):
             self.range_row_layout.addWidget(card)
         self.range_row_layout.addStretch()
 
-        # Pull history table
-        self.pull_table.setRowCount(len(pairs))
-        for row, (report, fight) in enumerate(pairs):
-            difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
-            result = "Kill ✓" if fight.kill else ("Wipe" if fight.kill is False else "--")
-            phase = "Farm" if classification[fight.id] == FARM else "Progression"
+        # Pull history rows
+        self._clear_pulls()
+        for i, (report, fight) in enumerate(pairs):
+            self._pulls_layout.addWidget(
+                self._build_pull_row(i + 1, report, fight, classification[fight.id], alt=i % 2 == 1)
+            )
 
-            items = [
-                str(row + 1),
-                f"{_format_date(report.start_time)} — {report.title or report.report_code}",
-                report.title or report.report_code or "--",
-                difficulty_label or "--",
-                result,
-                _format_duration(fight.start_time, fight.end_time),
-                phase,
-            ]
-            for col, text in enumerate(items):
-                item = QTableWidgetItem(text)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if fight.kill:
-                    item.setForeground(QColor("#2d8a4e"))
-                self.pull_table.setItem(row, col, item)
+    def _clear_pulls(self) -> None:
+        while self._pulls_layout.count():
+            item = self._pulls_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _build_pull_row(self, pull_number: int, report, fight, status: str, alt: bool) -> QFrame:
+        difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
+        result = "Kill âœ“" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        phase = "Farm" if status == FARM else "Progression"
+
+        row = QFrame()
+        bg = PALETTE.bg_card_hover if alt else "transparent"
+        row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+
+        num_lbl = QLabel(str(pull_number))
+        num_lbl.setProperty("class", "muted")
+        layout.addWidget(num_lbl, 1)
+
+        date_lbl = QLabel(_format_date(report.start_time))
+        date_lbl.setProperty("class", "muted")
+        date_lbl.setStyleSheet("font-size: 11px;")
+        layout.addWidget(date_lbl, 2)
+
+        rn_lbl = QLabel(report.title or report.report_code or "--")
+        rn_lbl.setStyleSheet("font-size: 11px;")
+        layout.addWidget(rn_lbl, 3)
+
+        diff_lbl = QLabel(difficulty_label or "--")
+        diff_lbl.setProperty("class", "muted")
+        layout.addWidget(diff_lbl, 2)
+
+        result_lbl = QLabel(result)
+        if fight.kill:
+            result_lbl.setStyleSheet(f"color: {PALETTE.success}; font-weight: 600;")
+        layout.addWidget(result_lbl, 1)
+
+        dur_lbl = QLabel(_format_duration(fight.start_time, fight.end_time))
+        dur_lbl.setProperty("class", "muted")
+        layout.addWidget(dur_lbl, 1)
+
+        phase_lbl = QLabel(phase)
+        phase_lbl.setProperty("class", "muted")
+        layout.addWidget(phase_lbl, 1)
+
+        return row
 
     def _build_range_card(self, group: dict) -> QFrame:
         card = QFrame()
@@ -345,7 +400,7 @@ class EncounterProgressionPage(QWidget):
         rate = round(100 * kills / pulls) if pulls else 0
 
         layout.addWidget(QLabel(f"{pulls} pulls"))
-        layout.addWidget(QLabel(f"{kills} kills · {wipes} wipes"))
+        layout.addWidget(QLabel(f"{kills} kills Â· {wipes} wipes"))
         rate_lbl = QLabel(f"{rate}% kill rate")
         tone = "success" if rate >= 80 else ("info" if rate >= 50 else "warning")
         rate_badge = make_badge(f"{rate}%", tone=tone)
@@ -353,3 +408,5 @@ class EncounterProgressionPage(QWidget):
 
         card.setFixedWidth(130)
         return card
+
+

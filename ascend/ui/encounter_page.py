@@ -1,4 +1,4 @@
-"""Encounter Analysis - drill into one boss across every pull and raid night
+﻿"""Encounter Analysis - drill into one boss across every pull and raid night
 it's been attempted in, with an objective progression-vs-farm
 classification and pull-range comparisons.
 
@@ -13,10 +13,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
-    QTableWidget,
-    QTableWidgetItem,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -25,11 +23,9 @@ from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository
 from ascend.services.encounter_classification import FARM, classify_pulls, group_by_pull_range
 from ascend.services.zone_data import label_for_difficulty
-from ascend.theme import apply_card_elevation
+from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
-
-PULL_COLUMNS = ["Pull #", "Raid Night", "Difficulty", "Result", "Duration", "Status"]
 
 
 def _format_date(epoch_ms: float | None) -> str:
@@ -47,6 +43,23 @@ def _format_duration(start: float | None, end: float | None) -> str:
     total_seconds = int((end - start) / 1000)
     minutes, seconds = divmod(total_seconds, 60)
     return f"{minutes}:{seconds:02d}"
+
+
+def _header_row(cols: list[tuple[str, int]]) -> QFrame:
+    header = QFrame()
+    header.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(header)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(8)
+    for text, stretch in cols:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: {PALETTE.text_muted};"
+        )
+        layout.addWidget(lbl, stretch)
+    return header
 
 
 class EncounterAnalysisPage(QWidget):
@@ -102,15 +115,79 @@ class EncounterAnalysisPage(QWidget):
         title.setStyleSheet("font-size: 13px; font-weight: 600;")
         layout.addWidget(title)
 
-        self.pull_table = QTableWidget(0, len(PULL_COLUMNS))
-        self.pull_table.setHorizontalHeaderLabels(PULL_COLUMNS)
-        self.pull_table.verticalHeader().setVisible(False)
-        self.pull_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.pull_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.pull_table.setAlternatingRowColors(True)
-        layout.addWidget(self.pull_table)
+        _COLS = [("#", 1), ("Raid Night", 4), ("Difficulty", 2), ("Result", 1), ("Duration", 1), ("Status", 1)]
+        layout.addWidget(_header_row(_COLS))
+
+        self._pulls_container = QWidget()
+        self._pulls_layout = QVBoxLayout(self._pulls_container)
+        self._pulls_layout.setContentsMargins(0, 0, 0, 0)
+        self._pulls_layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._pulls_container)
+        layout.addWidget(scroll, stretch=1)
 
         return card
+
+    def _clear_pulls(self) -> None:
+        while self._pulls_layout.count():
+            item = self._pulls_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+    def _build_pull_row(
+        self,
+        pull_number: int,
+        report,
+        fight,
+        status: str,
+        alt: bool,
+    ) -> QFrame:
+        difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
+        result = "Kill âœ“" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        raid_night = f"{_format_date(report.start_time)} â€” {report.title or report.report_code}"
+
+        row = QFrame()
+        bg = PALETTE.bg_card_hover if alt else "transparent"
+        row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(8)
+
+        num_lbl = QLabel(str(pull_number))
+        num_lbl.setProperty("class", "muted")
+        layout.addWidget(num_lbl, 1)
+
+        rn_lbl = QLabel(raid_night)
+        rn_lbl.setStyleSheet("font-size: 11px;")
+        layout.addWidget(rn_lbl, 4)
+
+        diff_lbl = QLabel(difficulty_label)
+        diff_lbl.setProperty("class", "muted")
+        layout.addWidget(diff_lbl, 2)
+
+        result_lbl = QLabel(result)
+        if fight.kill:
+            result_lbl.setStyleSheet(f"color: {PALETTE.success}; font-weight: 600;")
+        layout.addWidget(result_lbl, 1)
+
+        dur_lbl = QLabel(_format_duration(fight.start_time, fight.end_time))
+        dur_lbl.setProperty("class", "muted")
+        layout.addWidget(dur_lbl, 1)
+
+        status_wrap = QWidget()
+        status_layout = QHBoxLayout(status_wrap)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        tone = "success" if status == FARM else "accent"
+        status_layout.addWidget(make_badge(status.upper(), tone=tone))
+        status_layout.addStretch()
+        layout.addWidget(status_wrap, 1)
+
+        return row
 
     # -- Data -----------------------------------------------------------
 
@@ -152,6 +229,7 @@ class EncounterAnalysisPage(QWidget):
             item = self.range_row.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                widget.setParent(None)
                 widget.deleteLater()
 
     def _refresh_detail(self) -> None:
@@ -168,29 +246,12 @@ class EncounterAnalysisPage(QWidget):
             self.range_row.addWidget(self._build_range_card(group))
         self.range_row.addStretch()
 
-        self.pull_table.setRowCount(len(pairs))
-        for row, (report, fight) in enumerate(pairs):
-            difficulty_label = label_for_difficulty(self.db, report.zone_id, fight.difficulty)
-            result = "Kill" if fight.kill else ("Wipe" if fight.kill is False else "--")
+        self._clear_pulls()
+        for i, (report, fight) in enumerate(pairs):
             status = classification[fight.id]
-
-            values = [
-                str(row + 1),
-                f"{_format_date(report.start_time)} - {report.title or report.report_code}",
-                difficulty_label,
-                result,
-                _format_duration(fight.start_time, fight.end_time),
-            ]
-            for col, value in enumerate(values):
-                self.pull_table.setItem(row, col, QTableWidgetItem(value))
-
-            badge_wrap = QWidget()
-            badge_layout = QHBoxLayout(badge_wrap)
-            badge_layout.setContentsMargins(4, 2, 4, 2)
-            tone = "success" if status == FARM else "accent"
-            badge_layout.addWidget(make_badge(status.upper(), tone=tone))
-            badge_layout.addStretch()
-            self.pull_table.setCellWidget(row, len(PULL_COLUMNS) - 1, badge_wrap)
+            self._pulls_layout.addWidget(
+                self._build_pull_row(i + 1, report, fight, status, alt=i % 2 == 1)
+            )
 
     @staticmethod
     def _build_range_card(group: dict) -> QFrame:
@@ -210,3 +271,5 @@ class EncounterAnalysisPage(QWidget):
         layout.addWidget(value)
 
         return card
+
+
