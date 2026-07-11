@@ -26,7 +26,7 @@ def test_wizard_has_five_pages(qtbot, tmp_path):
     mgr = BackgroundTaskManager()
     wizard = FirstRunWizard(db, storage, mgr)
     qtbot.addWidget(wizard)
-    assert len(wizard.pageIds()) == 5
+    assert len(wizard.pageIds()) == 6
 
 
 def test_wizard_page_order(qtbot, tmp_path):
@@ -37,6 +37,7 @@ def test_wizard_page_order(qtbot, tmp_path):
         CredentialsPage,
         FirstAnalysisPage,
         FirstRunWizard,
+        GuildSetupPage,
         TierPage,
         WelcomePage,
     )
@@ -46,7 +47,7 @@ def test_wizard_page_order(qtbot, tmp_path):
     wizard = FirstRunWizard(db, storage, mgr)
     qtbot.addWidget(wizard)
     page_types = [type(wizard.page(pid)) for pid in wizard.pageIds()]
-    assert page_types == [WelcomePage, CredentialsPage, CharactersSetupPage, TierPage, FirstAnalysisPage]
+    assert page_types == [WelcomePage, CredentialsPage, CharactersSetupPage, GuildSetupPage, TierPage, FirstAnalysisPage]
 
 
 # ---------------------------------------------------------------------------

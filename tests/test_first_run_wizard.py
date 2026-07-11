@@ -19,7 +19,7 @@ class FakeKeyring:
 
 
 def test_first_run_wizard_has_all_setup_steps(tmp_path, qtbot):
-    # PR 4: wizard reduced from 11 to 5 pages
+    # 6 pages: Welcome, Credentials, Characters, Guild, Tier, FirstAnalysis
     db = Database(tmp_path / "wizard_test.db")
     db.initialize()
     try:
@@ -28,7 +28,7 @@ def test_first_run_wizard_has_all_setup_steps(tmp_path, qtbot):
         wizard = FirstRunWizard(db, secure_storage, task_manager)
         qtbot.addWidget(wizard)
 
-        assert len(wizard.pageIds()) == 5
+        assert len(wizard.pageIds()) == 6
     finally:
         db.close()
 

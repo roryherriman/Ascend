@@ -1,4 +1,4 @@
-"""First-run setup wizard — 5 steps from zero to first report.
+"""First-run setup wizard — 6 steps from zero to first report.
 
 Walks a new user through Ascend's one-time configuration without touching
 the command line or config files. All writes go to the same repositories
@@ -7,8 +7,9 @@ and secure storage that the rest of the app uses, so nothing here is fake.
 Step 1 — Welcome + privacy summary
 Step 2 — Profile + Warcraft Logs credentials
 Step 3 — Add characters
-Step 4 — Raid tier (auto-detected from WCL zones)
-Step 5 — Optional first report import
+Step 4 — Guild setup (optional WCL verification)
+Step 5 — Raid tier (auto-detected from WCL zones)
+Step 6 — Optional first report import
 """
 from __future__ import annotations
 
@@ -257,7 +258,147 @@ class _TierSignals(QObject):
 
 
 # ---------------------------------------------------------------------------
-# Step 4 — Raid tier (auto-detected from WCL; user can override)
+# Step 4 — Guild setup (optional: verify guild via WCL)
+# ---------------------------------------------------------------------------
+
+class GuildSetupPage(QWizardPage):
+    """Optional guild search and WCL verification step."""
+
+    def __init__(
+        self,
+        db,
+        settings_repo,
+        secure_storage,
+        task_manager,
+    ):
+        super().__init__()
+        self.db = db
+        self.settings_repo = settings_repo
+        self.secure_storage = secure_storage
+        self.task_manager = task_manager
+        self._active_task = None
+
+        self.setTitle("Your Guild")
+
+        layout = QVBoxLayout(self)
+
+        intro = QLabel(
+            "If you raid with a guild, enter its name and realm to verify it with Warcraft Logs. "
+            "You can skip this step and set it up later in Settings."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        form = QFormLayout()
+        self.guild_name_edit = QLineEdit()
+        self.guild_name_edit.setPlaceholderText("Guild Name")
+        form.addRow("Guild Name:", self.guild_name_edit)
+
+        self.guild_realm_edit = QLineEdit()
+        self.guild_realm_edit.setPlaceholderText("e.g. Proudmoore")
+        form.addRow("Realm:", self.guild_realm_edit)
+
+        self.region_combo = QComboBox()
+        self.region_combo.addItems(["US", "EU", "KR", "TW", "CN"])
+        saved = settings_repo.get("preferred_region", "US")
+        if saved in ["US", "EU", "KR", "TW", "CN"]:
+            self.region_combo.setCurrentText(saved)
+        form.addRow("Region:", self.region_combo)
+        layout.addLayout(form)
+
+        btn_row = QHBoxLayout()
+        self._verify_btn = QPushButton("Verify Guild")
+        self._verify_btn.clicked.connect(self._on_verify)
+        btn_row.addWidget(self._verify_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        self._status_label = QLabel("")
+        self._status_label.setWordWrap(True)
+        layout.addWidget(self._status_label)
+
+        layout.addStretch()
+
+        self._load_existing()
+
+    def _load_existing(self) -> None:
+        from ascend.services.guild_service import get_guild_summary
+        guild = get_guild_summary(self.settings_repo)
+        if guild and guild["name"]:
+            self.guild_name_edit.setText(guild["name"])
+            self.guild_realm_edit.setText(guild["realm"] or "")
+            region = (guild["region"] or "").upper()
+            if region in ["US", "EU", "KR", "TW", "CN"]:
+                self.region_combo.setCurrentText(region)
+            if guild["verified"]:
+                self._status_label.setText(
+                    f"Verified: {guild['name']} on {guild['realm']} [{guild['region'].upper()}]"
+                )
+                self._status_label.setStyleSheet("color: #4caf7d;")
+
+    def _on_verify(self) -> None:
+        from ascend.services.guild_service import realm_to_slug
+        name = self.guild_name_edit.text().strip()
+        realm = self.guild_realm_edit.text().strip()
+        region = self.region_combo.currentText()
+
+        if not name or not realm:
+            self._status_label.setStyleSheet("color: #e0a83e;")
+            self._status_label.setText("Enter guild name and realm to verify.")
+            return
+
+        client_id = self.settings_repo.get("wcl_client_id", "")
+        client_secret = self.secure_storage.get_client_secret() or ""
+        if not client_id or not client_secret:
+            self._status_label.setStyleSheet("color: #e0a83e;")
+            self._status_label.setText(
+                "WCL credentials not yet configured — you can verify the guild later from Settings."
+            )
+            return
+
+        self._verify_btn.setEnabled(False)
+        self._verify_btn.setText("Verifying…")
+        self._status_label.setStyleSheet("color: #888;")
+        self._status_label.setText("Contacting Warcraft Logs…")
+
+        server_slug = realm_to_slug(realm)
+        from ascend.ui.settings_page import _run_guild_verify
+        task = self.task_manager.submit(
+            _run_guild_verify, client_id, client_secret, 15.0,
+            name, server_slug, region.lower(),
+        )
+        self._active_task = task
+        task.signals.finished.connect(self._on_verified)
+        task.signals.error.connect(self._on_verify_failed)
+
+    def _on_verified(self, guild) -> None:
+        from ascend.services.guild_service import save_verified_guild
+        self._verify_btn.setEnabled(True)
+        self._verify_btn.setText("Verify Guild")
+        if not guild:
+            self._status_label.setStyleSheet("color: #e05555;")
+            self._status_label.setText(
+                "Guild not found. Check the spelling, realm, and region, then try again."
+            )
+            return
+        save_verified_guild(self.settings_repo, guild)
+        self.guild_name_edit.setText(guild.get("name", ""))
+        self.guild_realm_edit.setText(guild.get("server_name", ""))
+        self._status_label.setStyleSheet("color: #4caf7d;")
+        self._status_label.setText(
+            f"Verified: {guild.get('name')} on {guild.get('server_name')} "
+            f"[{(guild.get('region_slug') or '').upper()}]"
+        )
+
+    def _on_verify_failed(self, message: str) -> None:
+        self._verify_btn.setEnabled(True)
+        self._verify_btn.setText("Retry")
+        self._status_label.setStyleSheet("color: #e05555;")
+        self._status_label.setText(f"Verification failed: {message}")
+
+
+# ---------------------------------------------------------------------------
+# Step 5 — Raid tier (auto-detected from WCL; user can override)
 # ---------------------------------------------------------------------------
 
 class TierPage(QWizardPage):
@@ -431,6 +572,7 @@ class FirstRunWizard(QWizard):
         self.addPage(WelcomePage())
         self.addPage(CredentialsPage(settings_repo, secure_storage))
         self.addPage(CharactersSetupPage(db))
+        self.addPage(GuildSetupPage(db, settings_repo, secure_storage, task_manager))
         self.addPage(TierPage(settings_repo, secure_storage))
         self.addPage(FirstAnalysisPage(db, settings_repo, secure_storage, task_manager))
 
