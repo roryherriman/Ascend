@@ -11,15 +11,11 @@ after each sync without a separate refresh button.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QScrollArea,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -28,6 +24,7 @@ from ascend.analysis.scoring_engine import compute_score
 from ascend.analysis.scoring_models import CategoryScore, CategoryStatus, Classification, ConfidenceLevel
 from ascend.data.database import Database
 from ascend.data.repositories import CharacterRepository
+from ascend.theme import PALETTE
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
 
@@ -72,47 +69,65 @@ _CONFIDENCE_LABELS: dict[str, str] = {
     ConfidenceLevel.INSUFFICIENT_DATA: "Insufficient Data",
 }
 
-METRIC_COLUMNS = ["Metric", "Raw Value", "Normalized", "Baseline", "Conf ×", "Size ×", "Prog ×", "Contribution", "Note"]
+_METRIC_COLS = [
+    ("Metric", 3), ("Raw", 1), ("Norm", 1), ("Baseline", 2),
+    ("Conf x", 1), ("Size x", 1), ("Prog x", 1), ("Contrib", 1), ("Note", 3),
+]
 
 
-def _metric_table(category: CategoryScore) -> QTableWidget:
-    table = QTableWidget(len(category.metrics), len(METRIC_COLUMNS))
-    table.setHorizontalHeaderLabels(METRIC_COLUMNS)
-    table.verticalHeader().setVisible(False)
-    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-    table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-    table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-    table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-    table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeMode.Stretch)
-    table.setAlternatingRowColors(True)
-    table.setWordWrap(True)
-    table.verticalHeader().setDefaultSectionSize(44)
+def _metric_col_header() -> QFrame:
+    row = QFrame()
+    row.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(6)
+    for text, stretch in _METRIC_COLS:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: {PALETTE.text_muted};"
+        )
+        layout.addWidget(lbl, stretch)
+    return row
 
-    for row, m in enumerate(category.metrics):
-        def cell(text: str, align=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter) -> QTableWidgetItem:
-            item = QTableWidgetItem(text)
-            item.setTextAlignment(align)
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            return item
 
-        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+def _metric_row(m, alt: bool) -> QFrame:
+    row = QFrame()
+    bg = PALETTE.bg_card_hover if alt else "transparent"
+    row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 5, 10, 5)
+    layout.setSpacing(6)
 
-        table.setItem(row, 0, cell(m.metric_name))
-        table.setItem(row, 1, cell(str(m.raw_value) if m.raw_value is not None else "—", right))
-        table.setItem(row, 2, cell(
-            f"{m.normalized_value:.1f}" if m.normalized_value is not None else "—", right
-        ))
-        table.setItem(row, 3, cell(m.comparison_baseline))
-        table.setItem(row, 4, cell(f"{m.confidence_modifier:.2f}", right))
-        table.setItem(row, 5, cell(f"{m.sample_size_modifier:.2f}", right))
-        table.setItem(row, 6, cell(f"{m.progression_modifier:.2f}", right))
-        table.setItem(row, 7, cell(
-            f"{m.final_contribution:.1f}" if m.final_contribution is not None else "—", right
-        ))
-        table.setItem(row, 8, cell(m.note))
+    cells = [
+        (m.metric_name, 3),
+        (str(m.raw_value) if m.raw_value is not None else "-", 1),
+        (f"{m.normalized_value:.1f}" if m.normalized_value is not None else "-", 1),
+        (m.comparison_baseline, 2),
+        (f"{m.confidence_modifier:.2f}", 1),
+        (f"{m.sample_size_modifier:.2f}", 1),
+        (f"{m.progression_modifier:.2f}", 1),
+        (f"{m.final_contribution:.1f}" if m.final_contribution is not None else "-", 1),
+        (m.note, 3),
+    ]
+    for text, stretch in cells:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_secondary};")
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl, stretch)
+    return row
 
-    table.resizeRowsToContents()
-    return table
+
+def _metric_rows_widget(category: CategoryScore) -> QWidget:
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+    layout.addWidget(_metric_col_header())
+    for i, m in enumerate(category.metrics):
+        layout.addWidget(_metric_row(m, alt=i % 2 == 1))
+    return container
 
 
 def _category_card(category: CategoryScore) -> QFrame:
@@ -141,9 +156,7 @@ def _category_card(category: CategoryScore) -> QFrame:
         layout.addWidget(note_label)
 
     if category.metrics:
-        table = _metric_table(category)
-        table.setMaximumHeight(min(200, 44 + 44 * len(category.metrics)))
-        layout.addWidget(table)
+        layout.addWidget(_metric_rows_widget(category))
 
     return card
 

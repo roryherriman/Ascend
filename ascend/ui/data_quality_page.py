@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
+
+from ascend.theme import PALETTE
 
 from ascend.data.database import Database
 from ascend.data.repositories import SyncHistoryRepository
@@ -14,8 +16,8 @@ from ascend.services.data_quality import DETECTED, NO_DATA, character_identity_c
 from ascend.theme import apply_card_elevation
 from ascend.ui.widgets import make_badge
 
-SYNC_COLUMNS = ["Started", "Type", "Status", "Reports", "Pulls", "Error"]
-CONFIDENCE_COLUMNS = ["Character", "Raid Nights", "Participations", "Status"]
+_CONF_COLS = [("Character", 3), ("Raid Nights", 1), ("Participations", 1), ("Status", 2)]
+_SYNC_COLS = [("Started", 2), ("Type", 1), ("Status", 1), ("Reports", 1), ("Pulls", 1), ("Error", 3)]
 
 _STATUS_TONE = {DETECTED: "success", NO_DATA: "neutral"}  # NOT_DETECTED falls through to "warning"
 
@@ -72,33 +74,68 @@ class DataQualityPage(QWidget):
         subtitle.setStyleSheet("font-size: 11px;")
         layout.addWidget(subtitle)
 
-        self.confidence_table = QTableWidget(0, len(CONFIDENCE_COLUMNS))
-        self.confidence_table.setHorizontalHeaderLabels(CONFIDENCE_COLUMNS)
-        self.confidence_table.verticalHeader().setVisible(False)
-        self.confidence_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.confidence_table.setMaximumHeight(160)
-        layout.addWidget(self.confidence_table)
+        self._confidence_rows_layout = QVBoxLayout()
+        self._confidence_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._confidence_rows_layout.setSpacing(0)
+        layout.addLayout(self._confidence_rows_layout)
 
         return card
 
-    def _refresh_confidence(self) -> None:
-        entries = character_identity_confidence(self.db)
-        self.confidence_table.setRowCount(len(entries))
-        for row, entry in enumerate(entries):
-            self.confidence_table.setItem(row, 0, QTableWidgetItem(entry.display_name))
-            self.confidence_table.setItem(row, 1, QTableWidgetItem(str(entry.raid_nights)))
-            self.confidence_table.setItem(row, 2, QTableWidgetItem(str(entry.participations)))
+    def _col_header(self, cols: list) -> QFrame:
+        row = QFrame()
+        row.setStyleSheet(
+            f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+        )
+        h = QHBoxLayout(row)
+        h.setContentsMargins(10, 4, 10, 4)
+        h.setSpacing(8)
+        for text, stretch in cols:
+            lbl = QLabel(text.upper())
+            lbl.setStyleSheet(
+                f"font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: {PALETTE.text_muted};"
+            )
+            h.addWidget(lbl, stretch)
+        return row
 
-            status_text = {
-                DETECTED: "Detected", NO_DATA: "No Data Yet",
-            }.get(entry.status, "Not Yet Detected")
+    def _refresh_confidence(self) -> None:
+        while self._confidence_rows_layout.count():
+            item = self._confidence_rows_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+        entries = character_identity_confidence(self.db)
+        if not entries:
+            lbl = QLabel("No tracked characters yet.")
+            lbl.setProperty("class", "muted")
+            lbl.setStyleSheet("font-size: 11px; padding: 6px 10px;")
+            self._confidence_rows_layout.addWidget(lbl)
+            return
+
+        self._confidence_rows_layout.addWidget(self._col_header(_CONF_COLS))
+        for i, entry in enumerate(entries):
+            row = QFrame()
+            bg = PALETTE.bg_card_hover if i % 2 == 1 else "transparent"
+            row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+            h = QHBoxLayout(row)
+            h.setContentsMargins(10, 5, 10, 5)
+            h.setSpacing(8)
+
+            for text, stretch in [(entry.display_name, 3), (str(entry.raid_nights), 1), (str(entry.participations), 1)]:
+                lbl = QLabel(text)
+                lbl.setStyleSheet(f"font-size: 12px; color: {PALETTE.text_secondary};")
+                h.addWidget(lbl, stretch)
+
+            status_text = {DETECTED: "Detected", NO_DATA: "No Data Yet"}.get(entry.status, "Not Yet Detected")
             tone = _STATUS_TONE.get(entry.status, "warning")
             badge_wrap = QWidget()
             badge_layout = QHBoxLayout(badge_wrap)
-            badge_layout.setContentsMargins(4, 2, 4, 2)
+            badge_layout.setContentsMargins(0, 0, 0, 0)
             badge_layout.addWidget(make_badge(status_text.upper(), tone=tone))
             badge_layout.addStretch()
-            self.confidence_table.setCellWidget(row, 3, badge_wrap)
+            h.addWidget(badge_wrap, 2)
+            self._confidence_rows_layout.addWidget(row)
 
     # -- Small-sample warnings -------------------------------------------------
 
@@ -146,37 +183,65 @@ class DataQualityPage(QWidget):
         card = QFrame()
         card.setProperty("class", "card")
         apply_card_elevation(card)
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(8)
+        self._sync_card_layout = QVBoxLayout(card)
+        self._sync_card_layout.setContentsMargins(16, 14, 16, 14)
+        self._sync_card_layout.setSpacing(8)
 
         title = QLabel("Sync History")
         title.setStyleSheet("font-size: 13px; font-weight: 600;")
-        layout.addWidget(title)
+        self._sync_card_layout.addWidget(title)
 
-        self.sync_table = QTableWidget(0, len(SYNC_COLUMNS))
-        self.sync_table.setHorizontalHeaderLabels(SYNC_COLUMNS)
-        self.sync_table.verticalHeader().setVisible(False)
-        self.sync_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.sync_table.setAlternatingRowColors(True)
-        layout.addWidget(self.sync_table)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setMaximumHeight(220)
+        self._sync_rows_container = QWidget()
+        self._sync_rows_layout = QVBoxLayout(self._sync_rows_container)
+        self._sync_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._sync_rows_layout.setSpacing(0)
+        scroll.setWidget(self._sync_rows_container)
+        self._sync_card_layout.addWidget(scroll, stretch=1)
 
         return card
 
     def _refresh_sync_history(self) -> None:
+        while self._sync_rows_layout.count():
+            item = self._sync_rows_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
         entries = SyncHistoryRepository(self.db).recent(limit=20)
-        self.sync_table.setRowCount(len(entries))
-        for row, entry in enumerate(entries):
+        if not entries:
+            lbl = QLabel("No sync history yet.")
+            lbl.setProperty("class", "muted")
+            lbl.setStyleSheet("font-size: 11px; padding: 6px 10px;")
+            self._sync_rows_layout.addWidget(lbl)
+            return
+
+        self._sync_rows_layout.addWidget(self._col_header(_SYNC_COLS))
+        for i, entry in enumerate(entries):
+            row = QFrame()
+            bg = PALETTE.bg_card_hover if i % 2 == 1 else "transparent"
+            row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+            h = QHBoxLayout(row)
+            h.setContentsMargins(10, 5, 10, 5)
+            h.setSpacing(8)
             values = [
-                _format_timestamp(entry.started_at),
-                entry.operation_type,
-                entry.status,
-                str(entry.reports_processed),
-                str(entry.pulls_processed),
-                entry.error_message or "",
+                (_format_timestamp(entry.started_at), 2),
+                (entry.operation_type, 1),
+                (entry.status, 1),
+                (str(entry.reports_processed), 1),
+                (str(entry.pulls_processed), 1),
+                (entry.error_message or "", 3),
             ]
-            for col, value in enumerate(values):
-                self.sync_table.setItem(row, col, QTableWidgetItem(value))
+            for text, stretch in values:
+                lbl = QLabel(text)
+                lbl.setStyleSheet(f"font-size: 11px; color: {PALETTE.text_secondary};")
+                lbl.setWordWrap(False)
+                h.addWidget(lbl, stretch)
+            self._sync_rows_layout.addWidget(row)
 
     def reload(self) -> None:
         self._refresh_confidence()

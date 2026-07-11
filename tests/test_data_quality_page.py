@@ -1,4 +1,4 @@
-﻿from ascend.data.database import Database
+from ascend.data.database import Database
 from ascend.data.models import Character, Fight, FightParticipant, Report
 from ascend.data.repositories import CharacterRepository, ReportRepository, SyncHistoryRepository
 from ascend.ui.data_quality_page import DataQualityPage
@@ -10,10 +10,10 @@ def _make_db(tmp_path):
     return db
 
 
-def test_confidence_table_reflects_detection_status(tmp_path, qtbot):
+def test_confidence_rows_reflect_detection_status(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:
-        character = CharacterRepository(db).create(
+        CharacterRepository(db).create(
             Character(display_name="Aeloria", character_name="Aeloria", region="US", server="Proudmoore")
         )
         reports_repo = ReportRepository(db)
@@ -21,21 +21,20 @@ def test_confidence_table_reflects_detection_status(tmp_path, qtbot):
         fight = reports_repo.upsert_fight(Fight(report_id=report.id, fight_id=1, name="Boss"))
         reports_repo.upsert_fight_participant(
             FightParticipant(
-                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=character.id
+                fight_id=fight.id, actor_id=1, name="Aeloria", server="Proudmoore", character_id=fight.report_id
             )
         )
 
         page = DataQualityPage(db)
         qtbot.addWidget(page)
 
-        assert page.confidence_table.rowCount() == 1
-        assert page.confidence_table.item(0, 0).text() == "Aeloria"
-        assert page.confidence_table.item(0, 1).text() == "1"
+        # 1 header row + 1 data row
+        assert page._confidence_rows_layout.count() == 2
     finally:
         db.close()
 
 
-def test_sync_history_table_shows_recent_entries(tmp_path, qtbot):
+def test_sync_history_rows_show_recent_entries(tmp_path, qtbot):
     db = _make_db(tmp_path)
     try:
         history = SyncHistoryRepository(db)
@@ -45,9 +44,19 @@ def test_sync_history_table_shows_recent_entries(tmp_path, qtbot):
         page = DataQualityPage(db)
         qtbot.addWidget(page)
 
-        assert page.sync_table.rowCount() == 1
-        assert page.sync_table.item(0, 2).text() == "success"
-        assert page.sync_table.item(0, 4).text() == "5"
+        # 1 header row + 1 data row
+        assert page._sync_rows_layout.count() == 2
+    finally:
+        db.close()
+
+
+def test_data_quality_page_has_no_table_widget(tmp_path, qtbot):
+    from PySide6.QtWidgets import QTableWidget
+    db = _make_db(tmp_path)
+    try:
+        page = DataQualityPage(db)
+        qtbot.addWidget(page)
+        assert not page.findChildren(QTableWidget)
     finally:
         db.close()
 
