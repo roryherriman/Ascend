@@ -1,13 +1,12 @@
 """Centralized World of Warcraft class icon + color mapping.
 
-Icons are original glyphs (see resources/class_icons/LICENSE.txt), not
-Blizzard's class icon artwork - the Warcraft Logs API's GameClass/GameSpec
-schema exposes no icon field (verified before implementing this), so
-downloading or scraping a "real" class icon isn't an option without a
-separate Battle.net Game Data API integration, which is out of scope here.
+Icon loading preference order (never raises, never blocks):
+  1. PNG fetched from Blizzard Game Data API (build-time, gitignored)
+  2. JPG fetched from Blizzard Game Data API (build-time, gitignored)
+  3. SVG original glyph (committed, always present as fallback)
 
-Never import resources/class_icons paths directly elsewhere - always go
-through class_icon()/class_color() so the mapping stays centralized.
+Use class_icon()/class_icon_pixmap()/class_color() everywhere — never import
+paths from resources/class_icons directly so the fallback chain stays centralized.
 """
 from __future__ import annotations
 
@@ -43,16 +42,26 @@ _icon_cache: dict[str, QIcon] = {}
 def _slug(class_name: str | None) -> str:
     if not class_name:
         return "unknown"
-    key = class_name.strip().lower().replace(" ", "_")
-    return key if (_ICONS_DIR / f"{key}.svg").exists() else "unknown"
+    return class_name.strip().lower().replace(" ", "_")
+
+
+def _resolve_icon_path(slug: str) -> str | None:
+    """Return the best available icon file path for slug, or None if nothing found."""
+    for ext in (".png", ".jpg", ".jpeg", ".svg"):
+        candidate = _ICONS_DIR / f"{slug}{ext}"
+        if candidate.exists():
+            return str(candidate)
+    # Fall back to unknown SVG
+    fallback = _ICONS_DIR / "unknown.svg"
+    return str(fallback) if fallback.exists() else None
 
 
 def class_icon(class_name: str | None) -> QIcon:
-    """Never raises and never blocks on network - these are bundled SVGs."""
+    """Never raises and never blocks on network."""
     slug = _slug(class_name)
     if slug not in _icon_cache:
-        path = _ICONS_DIR / f"{slug}.svg"
-        _icon_cache[slug] = QIcon(str(path)) if path.exists() else QIcon()
+        path = _resolve_icon_path(slug)
+        _icon_cache[slug] = QIcon(path) if path else QIcon()
     return _icon_cache[slug]
 
 
