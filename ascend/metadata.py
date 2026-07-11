@@ -7,8 +7,8 @@ from __future__ import annotations
 
 APP_NAME = "Ascend"
 APP_TAGLINE = "Progression Performance Intelligence"
-APP_VERSION = "0.2.0"
-BUILD_NUMBER = "2"
+APP_VERSION = "1.0.0"
+BUILD_NUMBER = "1"
 COPYRIGHT = "Copyright (c) 2026 Rory Herriman"
 
 GITHUB_REPO = "roryherriman/Ascend"
@@ -17,9 +17,9 @@ WARCRAFT_LOGS_URL = "https://www.warcraftlogs.com"
 
 # Bumped independently of APP_VERSION when the analysis/scoring logic changes,
 # so stored analyses can be flagged as needing reanalysis (see docs/DATA_MODEL.md).
-ANALYSIS_ENGINE_VERSION = "0.1.0"
-SCORING_MODEL_VERSION = "0.1.0"
-ENCOUNTER_RULE_SCHEMA_VERSION = "0.1.0"
+ANALYSIS_ENGINE_VERSION = "1.0.0"
+SCORING_MODEL_VERSION = "1.0.0"
+ENCOUNTER_RULE_SCHEMA_VERSION = "1.0.0"
 
 DISCLAIMER = (
     "Ascend is an independent, unofficial tool. It is not affiliated with, "
