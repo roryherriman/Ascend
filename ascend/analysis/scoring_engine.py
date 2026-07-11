@@ -3,6 +3,8 @@ docs/SCORING.md for the full formulas this module implements.
 """
 from __future__ import annotations
 
+SCORING_VERSION = "1.0"
+
 from ascend.analysis.categories import (
     compute_consistency_category,
     compute_damage_category,
@@ -149,5 +151,6 @@ def compute_score(db: Database, character_id: int) -> ScoreBreakdown:
         classification=classification,
         sample_size=sample_size,
         coverage_ratio=round(coverage_ratio, 2),
+        scoring_version=SCORING_VERSION,
         notes=notes,
     )
