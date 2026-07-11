@@ -9,20 +9,15 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
-    QPlainTextEdit,
     QWidget,
 )
 
 from ascend.data.models import Character
 
 REGIONS = ["US", "EU", "KR", "TW", "CN"]
-SPEC_ROLES = ["", "tank", "healer", "ranged", "melee"]
-CLASSES = [
-    "Death Knight", "Demon Hunter", "Druid", "Evoker", "Hunter", "Mage",
-    "Monk", "Paladin", "Priest", "Rogue", "Shaman", "Warlock", "Warrior",
-]
 
 
 def show_error(parent: QWidget | None, title: str, message: str) -> None:
@@ -49,7 +44,7 @@ def confirm(parent: QWidget | None, title: str, message: str) -> bool:
 
 
 class CharacterDialog(QDialog):
-    """Add or edit a character. Characters are stored in SQLite, never hardcoded."""
+    """Add or edit a character. Class and role are detected automatically from raid data."""
 
     def __init__(
         self,
@@ -71,29 +66,23 @@ class CharacterDialog(QDialog):
         self.server_edit = QLineEdit()
         self._setup_realm_completer()
         self.region_combo.currentTextChanged.connect(self._update_realm_completer)
-        self.wcl_id_edit = QLineEdit()
-        self.class_combo = QComboBox()
-        self.class_combo.addItems(CLASSES)
         self.role_combo = QComboBox()
         self.role_combo.addItems(["primary", "alternate"])
-        self.spec_role_combo = QComboBox()
-        self.spec_role_combo.addItems(SPEC_ROLES)
         self.enabled_checkbox = QCheckBox("Enabled")
         self.enabled_checkbox.setChecked(True)
-        self.notes_edit = QPlainTextEdit()
-        self.notes_edit.setMaximumHeight(80)
+
+        detected_note = QLabel("Class and spec role are detected automatically from your raid logs.")
+        detected_note.setWordWrap(True)
+        detected_note.setStyleSheet("color: #888; font-size: 11px;")
 
         form = QFormLayout()
         form.addRow("Display name:", self.display_name_edit)
         form.addRow("Character name:", self.character_name_edit)
         form.addRow("Region:", self.region_combo)
         form.addRow("Server:", self.server_edit)
-        form.addRow("Warcraft Logs character ID:", self.wcl_id_edit)
-        form.addRow("Class:", self.class_combo)
         form.addRow("Primary / alternate:", self.role_combo)
-        form.addRow("Role (tank/healer/ranged/melee):", self.spec_role_combo)
         form.addRow("", self.enabled_checkbox)
-        form.addRow("Notes:", self.notes_edit)
+        form.addRow("", detected_note)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
@@ -109,15 +98,8 @@ class CharacterDialog(QDialog):
             if character.region in REGIONS:
                 self.region_combo.setCurrentText(character.region)
             self.server_edit.setText(character.server)
-            if character.wcl_character_id:
-                self.wcl_id_edit.setText(str(character.wcl_character_id))
-            if character.character_class in CLASSES:
-                self.class_combo.setCurrentText(character.character_class)
             self.role_combo.setCurrentText(character.character_role)
-            if character.spec_role in SPEC_ROLES:
-                self.spec_role_combo.setCurrentText(character.spec_role or "")
             self.enabled_checkbox.setChecked(character.enabled)
-            self.notes_edit.setPlainText(character.notes or "")
 
     def _setup_realm_completer(self) -> None:
         from ascend.data.wow_data import realms_for_region
@@ -142,26 +124,22 @@ class CharacterDialog(QDialog):
         if not self.server_edit.text().strip():
             show_error(self, "Missing information", "Server is required.")
             return
-        wcl_id_text = self.wcl_id_edit.text().strip()
-        if wcl_id_text and not wcl_id_text.isdigit():
-            show_error(self, "Invalid character ID", "Warcraft Logs character ID must be numeric.")
-            return
         self.accept()
 
     def result_character(self) -> Character:
-        wcl_id_text = self.wcl_id_edit.text().strip()
+        existing = self._character
         return Character(
-            id=self._character.id if self._character else None,
+            id=existing.id if existing else None,
             display_name=self.display_name_edit.text().strip(),
             character_name=self.character_name_edit.text().strip(),
             region=self.region_combo.currentText(),
             server=self.server_edit.text().strip(),
-            wcl_character_id=int(wcl_id_text) if wcl_id_text else None,
-            character_class=self.class_combo.currentText(),
+            wcl_character_id=existing.wcl_character_id if existing else None,
+            character_class=existing.character_class if existing else None,
             character_role=self.role_combo.currentText(),
-            spec_role=self.spec_role_combo.currentText() or None,
+            spec_role=existing.spec_role if existing else None,
             enabled=self.enabled_checkbox.isChecked(),
-            notes=self.notes_edit.toPlainText().strip(),
+            notes=existing.notes if existing else "",
         )
 
 

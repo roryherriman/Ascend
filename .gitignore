@@ -43,5 +43,11 @@ demo_data/
 .idea/
 *.user
 
+# Blizzard class icons — fetched at build time via scripts/fetch_assets.py
+# See CLASS_ICON_SOURCES.md for attribution. Only SVG originals are committed.
+ascend/resources/class_icons/*.png
+ascend/resources/class_icons/*.jpg
+ascend/resources/class_icons/*.jpeg
+
 # Claude Code session artifacts (local tooling, not project code)
 .claude/
