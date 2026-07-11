@@ -257,6 +257,32 @@ class ReportRepository:
         )
         return [(row["encounter_id"], row["name"]) for row in rows]
 
+    def distinct_zones(self) -> list[tuple[int | None, str]]:
+        """Every (zone_id, zone_name) pair seen in reports, ordered by name."""
+        rows = self.db.query_all(
+            """
+            SELECT DISTINCT zone_id, zone_name FROM reports
+            WHERE zone_name IS NOT NULL
+            ORDER BY zone_name COLLATE NOCASE
+            """
+        )
+        return [(row["zone_id"], row["zone_name"]) for row in rows]
+
+    def distinct_encounters_for_zone(self, zone_id: int | None) -> list[tuple[int, str]]:
+        """Encounters filtered to a single zone (matched via reports.zone_id)."""
+        rows = self.db.query_all(
+            """
+            SELECT DISTINCT f.encounter_id, f.name
+            FROM fights f
+            JOIN reports r ON r.id = f.report_id
+            WHERE f.encounter_id IS NOT NULL AND f.name IS NOT NULL
+              AND r.zone_id = ?
+            ORDER BY f.name COLLATE NOCASE
+            """,
+            (zone_id,),
+        )
+        return [(row["encounter_id"], row["name"]) for row in rows]
+
     def participation_counts(self, character_id: int) -> tuple[int, int]:
         """(eligible_pulls, participated_pulls) - eligible is every fight in
         every synced report (every logged pull was a chance to attend, per
