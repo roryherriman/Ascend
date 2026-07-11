@@ -122,6 +122,7 @@ class EncounterProgressionPage(QWidget):
         self.db = db
         self.reports_repo = ReportRepository(db)
         self._encounters: list[tuple[int, str]] = []
+        self._zones: list[tuple[int | None, str]] = []
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(24, 24, 24, 24)
@@ -141,11 +142,21 @@ class EncounterProgressionPage(QWidget):
         self._layout.addWidget(subtitle)
 
         picker_row = QHBoxLayout()
+
+        zone_label = QLabel("Tier:")
+        zone_label.setProperty("class", "muted")
+        picker_row.addWidget(zone_label)
+        self.zone_combo = QComboBox()
+        self.zone_combo.setMinimumWidth(200)
+        self.zone_combo.currentIndexChanged.connect(self._on_zone_selected)
+        picker_row.addWidget(self.zone_combo)
+        picker_row.addSpacing(16)
+
         picker_label = QLabel("Boss:")
         picker_label.setProperty("class", "muted")
         picker_row.addWidget(picker_label)
         self.encounter_combo = QComboBox()
-        self.encounter_combo.setMinimumWidth(280)
+        self.encounter_combo.setMinimumWidth(240)
         self.encounter_combo.currentIndexChanged.connect(self._refresh_detail)
         picker_row.addWidget(self.encounter_combo)
         picker_row.addStretch()
@@ -224,10 +235,12 @@ class EncounterProgressionPage(QWidget):
         self.reload()
 
     def reload(self) -> None:
+        self._zones = self.reports_repo.distinct_zones()
         self._encounters = self.reports_repo.distinct_encounters()
         show = bool(self._encounters)
         self.detail_widget.setVisible(show)
         self.encounter_combo.setVisible(show)
+        self.zone_combo.setVisible(show)
         if not show:
             if self.empty_state is None:
                 self.empty_state = AscendEmptyState(
@@ -241,9 +254,28 @@ class EncounterProgressionPage(QWidget):
         if self.empty_state is not None:
             self.empty_state.setVisible(False)
 
+        self.zone_combo.blockSignals(True)
+        self.zone_combo.clear()
+        self.zone_combo.addItem("All Tiers", userData=None)
+        for zone_id, zone_name in self._zones:
+            self.zone_combo.addItem(zone_name, userData=zone_id)
+        self.zone_combo.blockSignals(False)
+
+        self._refresh_encounter_combo()
+
+    def _on_zone_selected(self) -> None:
+        self._refresh_encounter_combo()
+
+    def _refresh_encounter_combo(self) -> None:
+        zone_id = self.zone_combo.currentData()
+        if zone_id is None:
+            encounters = self._encounters
+        else:
+            encounters = self.reports_repo.distinct_encounters_for_zone(zone_id)
+
         self.encounter_combo.blockSignals(True)
         self.encounter_combo.clear()
-        for encounter_id, name in self._encounters:
+        for encounter_id, name in encounters:
             self.encounter_combo.addItem(name, userData=encounter_id)
         self.encounter_combo.blockSignals(False)
         self._refresh_detail()

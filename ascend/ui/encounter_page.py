@@ -68,6 +68,7 @@ class EncounterAnalysisPage(QWidget):
         self.db = db
         self.reports_repo = ReportRepository(db)
         self._encounters: list[tuple[int, str]] = []
+        self._zones: list[tuple[int | None, str]] = []
 
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(24, 24, 24, 24)
@@ -78,11 +79,21 @@ class EncounterAnalysisPage(QWidget):
         self._layout.addWidget(title)
 
         self._picker_row = QHBoxLayout()
+
+        zone_label = QLabel("Tier:")
+        zone_label.setProperty("class", "muted")
+        self._picker_row.addWidget(zone_label)
+        self.zone_combo = QComboBox()
+        self.zone_combo.setMinimumWidth(200)
+        self.zone_combo.currentIndexChanged.connect(self._on_zone_selected)
+        self._picker_row.addWidget(self.zone_combo)
+        self._picker_row.addSpacing(16)
+
         picker_label = QLabel("Encounter:")
         picker_label.setProperty("class", "muted")
         self._picker_row.addWidget(picker_label)
         self.encounter_combo = QComboBox()
-        self.encounter_combo.setMinimumWidth(280)
+        self.encounter_combo.setMinimumWidth(240)
         self.encounter_combo.currentIndexChanged.connect(self._on_encounter_selected)
         self._picker_row.addWidget(self.encounter_combo)
         self._picker_row.addStretch()
@@ -192,14 +203,34 @@ class EncounterAnalysisPage(QWidget):
     # -- Data -----------------------------------------------------------
 
     def reload(self) -> None:
+        self._zones = self.reports_repo.distinct_zones()
         self._encounters = self.reports_repo.distinct_encounters()
         self._show_empty_state(not self._encounters)
         if not self._encounters:
             return
 
+        self.zone_combo.blockSignals(True)
+        self.zone_combo.clear()
+        self.zone_combo.addItem("All Tiers", userData=None)
+        for zone_id, zone_name in self._zones:
+            self.zone_combo.addItem(zone_name, userData=zone_id)
+        self.zone_combo.blockSignals(False)
+
+        self._refresh_encounter_combo()
+
+    def _on_zone_selected(self) -> None:
+        self._refresh_encounter_combo()
+
+    def _refresh_encounter_combo(self) -> None:
+        zone_id = self.zone_combo.currentData()
+        if zone_id is None:
+            encounters = self._encounters
+        else:
+            encounters = self.reports_repo.distinct_encounters_for_zone(zone_id)
+
         self.encounter_combo.blockSignals(True)
         self.encounter_combo.clear()
-        for encounter_id, name in self._encounters:
+        for encounter_id, name in encounters:
             self.encounter_combo.addItem(name, userData=encounter_id)
         self.encounter_combo.blockSignals(False)
         self._refresh_detail()
