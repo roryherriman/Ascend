@@ -104,6 +104,20 @@ def _run_guild_verify(progress_cb, cancel_token, client_id: str, client_secret: 
     return client.fetch_guild(name, server_slug, region)
 
 
+def _run_bnet_guild_crest(
+    progress_cb, cancel_token,
+    db, region: str, realm: str, guild_name: str,
+    bnet_client_id: str, bnet_client_secret: str, timeout: float,
+):
+    from ascend.services.guild_icon_service import try_fetch_blizzard_guild_crest
+    progress_cb(20, "Authenticating with Battle.net...")
+    result = try_fetch_blizzard_guild_crest(
+        db, region, realm, guild_name, bnet_client_id, bnet_client_secret, timeout=timeout
+    )
+    progress_cb(100, "Done.")
+    return result
+
+
 class SettingsPage(QWidget):
     restart_wizard_requested = Signal()
 
@@ -142,6 +156,7 @@ class SettingsPage(QWidget):
 
         form_layout.addWidget(self._build_profile_group())
         form_layout.addWidget(self._build_credentials_group())
+        form_layout.addWidget(self._build_bnet_credentials_group())
         form_layout.addWidget(self._build_raid_context_group())
         form_layout.addWidget(self._build_guild_group())
         form_layout.addWidget(self._build_scoring_weights_group())
@@ -196,6 +211,29 @@ class SettingsPage(QWidget):
         test_button = QPushButton("Test Warcraft Logs Connection")
         test_button.clicked.connect(self._on_test_connection)
         form.addRow("", test_button)
+
+        return group
+
+    def _build_bnet_credentials_group(self) -> QGroupBox:
+        group = QGroupBox("Battle.net Credentials (optional — for guild crests)")
+        form = QFormLayout(group)
+
+        self.bnet_client_id_edit = QLineEdit()
+        self.bnet_client_id_edit.setPlaceholderText("Battle.net client ID")
+        form.addRow("Client ID:", self.bnet_client_id_edit)
+
+        self.bnet_client_secret_edit = QLineEdit()
+        self.bnet_client_secret_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.bnet_client_secret_edit.setPlaceholderText("Battle.net client secret")
+        form.addRow("Client Secret:", self.bnet_client_secret_edit)
+
+        note = QLabel(
+            "Register a client at develop.battle.net to enable guild crest fetching. "
+            "The secret is stored in Windows Credential Manager, never in plain text."
+        )
+        note.setProperty("class", "muted")
+        note.setWordWrap(True)
+        form.addRow("", note)
 
         return group
 
@@ -300,8 +338,15 @@ class SettingsPage(QWidget):
 
         icon_form = QFormLayout()
         icon_row = QWidget()
+        self._bnet_crest_btn = QPushButton("Fetch Blizzard Crest")
+        self._bnet_crest_btn.setToolTip(
+            "Download the guild emblem from the Blizzard Game Data API.\n"
+            "Requires Battle.net credentials saved above."
+        )
+        self._bnet_crest_btn.clicked.connect(self._on_fetch_blizzard_crest)
         icon_row_layout = _horizontal(
             self._build_button("Refresh Guild Icon", self._on_refresh_guild_icon),
+            self._bnet_crest_btn,
             self._build_button("Choose Custom Image...", self._on_choose_custom_guild_icon),
             self._build_button("Clear Cached Icon", self._on_clear_guild_icon),
             self._build_button("Reset to Automatic", self._on_reset_guild_icon),
@@ -309,8 +354,9 @@ class SettingsPage(QWidget):
         icon_row.setLayout(icon_row_layout)
         icon_form.addRow("Guild Icon:", icon_row)
         note = QLabel(
-            "Warcraft Logs does not expose a guild emblem, so Ascend generates a badge "
-            "from the guild name unless you choose a custom local image (never uploaded)."
+            "Ascend can fetch your guild's emblem from the Blizzard Game Data API when "
+            "Battle.net credentials are configured above. Without credentials, a badge is "
+            "generated from the guild initials. Custom local images are never uploaded."
         )
         note.setProperty("class", "muted")
         note.setWordWrap(True)
@@ -556,6 +602,8 @@ class SettingsPage(QWidget):
             self.preferred_region_combo.setCurrentText(preferred_region)
         self.client_id_edit.setText(self.settings_repo.get("wcl_client_id", ""))
         self.client_secret_edit.setText(self.secure_storage.get_client_secret() or "")
+        self.bnet_client_id_edit.setText(self.settings_repo.get("bnet_client_id", ""))
+        self.bnet_client_secret_edit.setText(self.secure_storage.get_bnet_client_secret() or "")
 
         zones, cached_at, is_cache = get_zones_for_display(self.db)
         self._populate_tier_combo(zones, cached_at, is_cache)
@@ -663,6 +711,8 @@ class SettingsPage(QWidget):
         self.settings_repo.set("preferred_region", self.preferred_region_combo.currentText())
         self.settings_repo.set("wcl_client_id", self.client_id_edit.text().strip())
         self.secure_storage.set_client_secret(self.client_secret_edit.text().strip() or None)
+        self.settings_repo.set("bnet_client_id", self.bnet_client_id_edit.text().strip())
+        self.secure_storage.set_bnet_client_secret(self.bnet_client_secret_edit.text().strip() or None)
 
         tier_name = self.current_tier_combo.currentText().strip()
         self.settings_repo.set("current_tier", tier_name)
@@ -1038,6 +1088,53 @@ class SettingsPage(QWidget):
             return None
         region, realm = self._guild_region_realm()
         return region, realm, guild_name
+
+    def _on_fetch_blizzard_crest(self) -> None:
+        identity = self._current_guild_identity()
+        if identity is None:
+            return
+        region, realm, guild_name = identity
+        bnet_id = self.bnet_client_id_edit.text().strip() or self.settings_repo.get("bnet_client_id", "")
+        bnet_secret = self.bnet_client_secret_edit.text().strip() or self.secure_storage.get_bnet_client_secret() or ""
+        if not bnet_id or not bnet_secret:
+            show_error(
+                self, "Battle.net credentials required",
+                "Enter Battle.net Client ID and Secret in the Battle.net Credentials section above, "
+                "then save settings before fetching the guild crest.",
+            )
+            return
+
+        self._bnet_crest_btn.setText("Fetching…")
+        self._bnet_crest_btn.setEnabled(False)
+        timeout = float(self.api_timeout_spin.value())
+        self.task_panel.start(f"Fetching guild crest for {guild_name} from Blizzard API...")
+        task = self.task_manager.submit(
+            _run_bnet_guild_crest,
+            self.db, region, realm, guild_name, bnet_id, bnet_secret, timeout,
+        )
+        self._active_task = task
+        task.signals.progress.connect(self.task_panel.update_progress)
+        task.signals.finished.connect(self._on_bnet_crest_fetched)
+        task.signals.error.connect(self._on_bnet_crest_failed)
+
+    def _on_bnet_crest_fetched(self, record) -> None:
+        self._bnet_crest_btn.setText("Fetch Blizzard Crest")
+        self._bnet_crest_btn.setEnabled(True)
+        self.task_panel.finish("Guild crest fetch complete.")
+        if record:
+            show_info(self, "Guild crest fetched", "The Blizzard guild emblem has been saved to your local cache.")
+        else:
+            show_info(
+                self, "No emblem available",
+                "Blizzard returned no emblem for this guild. "
+                "The generated initials badge will be used instead.",
+            )
+
+    def _on_bnet_crest_failed(self, message: str) -> None:
+        self._bnet_crest_btn.setText("Fetch Blizzard Crest")
+        self._bnet_crest_btn.setEnabled(True)
+        self.task_panel.reset()
+        show_error(self, "Crest fetch failed", f"Could not fetch guild crest:\n\n{message}")
 
     def _on_refresh_guild_icon(self) -> None:
         identity = self._current_guild_identity()

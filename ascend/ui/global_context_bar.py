@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from ascend.data.database import Database
 from ascend.data.repositories import SettingsRepository
+from ascend.services.guild_icon_service import get_guild_badge_pixmap
 from ascend.ui.class_icons import class_icon_pixmap, class_color
 from ascend.ui.styles.tokens import DARK_TOKENS
 
@@ -171,19 +172,30 @@ class GlobalContextBar(QWidget):
         if guild_name:
             self._guild_name.setText(guild_name)
             self._guild_name.setStyleSheet(f"font-size: 12px; color: {DARK_TOKENS.palette.text_secondary};")
-            # Guild badge mini: colored square with initial (full badge renders in PR 3)
-            self._guild_icon.setText(guild_name[:1].upper())
-            self._guild_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._guild_icon.setStyleSheet(f"""
-                font-size: 10px; font-weight: 600;
-                color: {DARK_TOKENS.palette.text_on_accent};
-                background: {DARK_TOKENS.palette.accent_muted};
-                border-radius: 4px;
-            """)
+            try:
+                badge_pm = get_guild_badge_pixmap(
+                    self.db,
+                    guild_realm or "",
+                    guild_realm or "",
+                    guild_name,
+                    size=20,
+                )
+                self._guild_icon.setPixmap(badge_pm)
+                self._guild_icon.setText("")
+                self._guild_icon.setStyleSheet("")
+            except Exception:  # noqa: BLE001
+                self._guild_icon.setText(guild_name[:1].upper())
+                self._guild_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._guild_icon.setStyleSheet(f"""
+                    font-size: 10px; font-weight: 600;
+                    color: {DARK_TOKENS.palette.text_on_accent};
+                    background: {DARK_TOKENS.palette.accent_muted};
+                    border-radius: 4px;
+                """)
         else:
             self._guild_name.setText("No Guild")
             self._guild_name.setStyleSheet(f"font-size: 12px; color: {DARK_TOKENS.palette.text_disabled};")
-            self._guild_icon.setText("")
+            self._guild_icon.clear()
             self._guild_icon.setStyleSheet(f"background: {DARK_TOKENS.palette.bg_input}; border-radius: 4px;")
 
         if tier_name:
