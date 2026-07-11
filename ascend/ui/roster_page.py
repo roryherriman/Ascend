@@ -9,15 +9,70 @@ empty performance columns.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ascend.data.database import Database
 from ascend.services.roster import roster_summary
+from ascend.theme import PALETTE, apply_card_elevation
 from ascend.ui.components import AscendEmptyState
 from ascend.ui.widgets import make_badge
 
-COLUMNS = ["Name", "Server", "Class", "Raid Nights", "Pulls", "Tracked"]
+
+def _header_row() -> QFrame:
+    row = QFrame()
+    row.setStyleSheet(
+        f"background: {PALETTE.bg_card}; border-bottom: 1px solid {PALETTE.border};"
+    )
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 4, 10, 4)
+    layout.setSpacing(8)
+    for text, stretch in [("Name", 3), ("Server", 2), ("Class", 2), ("Raid Nights", 1), ("Pulls", 1), ("", 1)]:
+        lbl = QLabel(text.upper())
+        lbl.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: {PALETTE.text_muted};"
+        )
+        layout.addWidget(lbl, stretch)
+    return row
+
+
+def _member_row(member, alt: bool) -> QFrame:
+    row = QFrame()
+    bg = PALETTE.bg_card_hover if alt else "transparent"
+    row.setStyleSheet(f"background: {bg}; border-bottom: 1px solid {PALETTE.border};")
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(10, 5, 10, 5)
+    layout.setSpacing(8)
+
+    name_lbl = QLabel(member.name)
+    name_lbl.setStyleSheet("font-size: 12px; font-weight: 600;")
+    layout.addWidget(name_lbl, 3)
+
+    for text, stretch in [
+        (member.server or "--", 2),
+        (member.class_name or "--", 2),
+        (str(member.raid_nights), 1),
+        (str(member.pulls), 1),
+    ]:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(f"font-size: 12px; color: {PALETTE.text_secondary};")
+        layout.addWidget(lbl, stretch)
+
+    badge_wrap = QWidget()
+    badge_layout = QHBoxLayout(badge_wrap)
+    badge_layout.setContentsMargins(0, 0, 0, 0)
+    if member.character_id is not None:
+        badge_layout.addWidget(make_badge("TRACKED", tone="accent"))
+    badge_layout.addStretch()
+    layout.addWidget(badge_wrap, 1)
+
+    return row
 
 
 class RosterComparisonPage(QWidget):
@@ -41,14 +96,27 @@ class RosterComparisonPage(QWidget):
         subtitle.setWordWrap(True)
         self._layout.addWidget(subtitle)
 
-        self.table = QTableWidget(0, len(COLUMNS))
-        self.table.setHorizontalHeaderLabels(COLUMNS)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setAlternatingRowColors(True)
-        self.table.setSortingEnabled(True)
-        self._layout.addWidget(self.table, stretch=1)
+        self._card = QFrame()
+        self._card.setProperty("class", "card")
+        apply_card_elevation(self._card)
+        card_layout = QVBoxLayout(self._card)
+        card_layout.setContentsMargins(0, 0, 0, 0)
+        card_layout.setSpacing(0)
+
+        card_layout.addWidget(_header_row())
+
+        self._rows_container = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_container)
+        self._rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._rows_layout.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._rows_container)
+        card_layout.addWidget(scroll, stretch=1)
+
+        self._layout.addWidget(self._card, stretch=1)
 
         self.empty_state: AscendEmptyState | None = None
 
@@ -56,7 +124,15 @@ class RosterComparisonPage(QWidget):
 
     def reload(self) -> None:
         members = roster_summary(self.db)
-        self.table.setVisible(bool(members))
+
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+
+        self._card.setVisible(bool(members))
         if self.empty_state is not None:
             self.empty_state.setVisible(not members)
         elif not members:
@@ -67,30 +143,10 @@ class RosterComparisonPage(QWidget):
                 icon_name="roster",
             )
             self._layout.addWidget(self.empty_state, stretch=1)
+
         if not members:
             return
 
-        self.table.setSortingEnabled(False)
-        self.table.setRowCount(len(members))
-        for row, member in enumerate(members):
-            values = [
-                member.name,
-                member.server or "--",
-                member.class_name or "--",
-                str(member.raid_nights),
-                str(member.pulls),
-            ]
-            for col, value in enumerate(values):
-                self.table.setItem(row, col, QTableWidgetItem(value))
-            # Numeric DisplayRole data so column sorting compares as numbers, not strings.
-            self.table.item(row, 3).setData(Qt.ItemDataRole.DisplayRole, member.raid_nights)
-            self.table.item(row, 4).setData(Qt.ItemDataRole.DisplayRole, member.pulls)
-
-            badge_wrap = QWidget()
-            badge_layout = QHBoxLayout(badge_wrap)
-            badge_layout.setContentsMargins(4, 2, 4, 2)
-            if member.character_id is not None:
-                badge_layout.addWidget(make_badge("TRACKED", tone="accent"))
-            badge_layout.addStretch()
-            self.table.setCellWidget(row, len(COLUMNS) - 1, badge_wrap)
-        self.table.setSortingEnabled(True)
+        sorted_members = sorted(members, key=lambda m: (-m.pulls, m.name.lower()))
+        for i, member in enumerate(sorted_members):
+            self._rows_layout.addWidget(_member_row(member, alt=i % 2 == 1))
