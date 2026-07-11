@@ -81,4 +81,5 @@ class ScoreBreakdown:
     classification: Classification
     sample_size: int  # relevant progression pulls considered
     coverage_ratio: float  # fraction of the 100-point weight actually backed by data
+    scoring_version: str = "1.0"
     notes: list[str] = field(default_factory=list)
