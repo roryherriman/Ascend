@@ -19,6 +19,7 @@ class FakeKeyring:
 
 
 def test_first_run_wizard_has_all_setup_steps(tmp_path, qtbot):
+    # PR 4: wizard reduced from 11 to 5 pages
     db = Database(tmp_path / "wizard_test.db")
     db.initialize()
     try:
@@ -27,12 +28,13 @@ def test_first_run_wizard_has_all_setup_steps(tmp_path, qtbot):
         wizard = FirstRunWizard(db, secure_storage, task_manager)
         qtbot.addWidget(wizard)
 
-        assert len(wizard.pageIds()) == 11
+        assert len(wizard.pageIds()) == 5
     finally:
         db.close()
 
 
 def test_first_run_wizard_credentials_page_saves_on_next(tmp_path, qtbot):
+    # PR 4: Welcome -> Credentials (step 2, no longer step 4)
     db = Database(tmp_path / "wizard_test2.db")
     db.initialize()
     try:
@@ -42,9 +44,7 @@ def test_first_run_wizard_credentials_page_saves_on_next(tmp_path, qtbot):
         qtbot.addWidget(wizard)
         wizard.show()
 
-        wizard.next()  # Welcome -> PlayerProfile
-        wizard.next()  # PlayerProfile -> LocalFirst
-        wizard.next()  # LocalFirst -> Credentials
+        wizard.next()  # Welcome -> Credentials
         credentials_page = wizard.currentPage()
         credentials_page.client_id_edit.setText("wizard-client-id")
         credentials_page.client_secret_edit.setText("wizard-client-secret")
