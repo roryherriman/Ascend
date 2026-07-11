@@ -26,6 +26,7 @@ from typing import Any
 SERVICE_NAME = "Ascend"
 CLIENT_SECRET_KEY = "wcl_client_secret"
 DISCORD_WEBHOOK_KEY = "discord_webhook_url"
+BNET_CLIENT_SECRET_KEY = "bnet_client_secret"
 
 _PROBE_KEY = "__ascend_probe__"
 
@@ -142,6 +143,12 @@ class SecureStorage:
 
     def set_discord_webhook(self, value: str | None) -> None:
         self.set_secret(DISCORD_WEBHOOK_KEY, value)
+
+    def get_bnet_client_secret(self) -> str | None:
+        return self.get_secret(BNET_CLIENT_SECRET_KEY)
+
+    def set_bnet_client_secret(self, value: str | None) -> None:
+        self.set_secret(BNET_CLIENT_SECRET_KEY, value)
 
     # -- fallback file storage -----------------------------------------
 
