@@ -117,9 +117,9 @@ def test_no_data_and_active_states_are_different_widget_types(tmp_path, qtbot):
         # No Data must never expose analytics widgets (KPI row, trend chart,
         # raid-night table) that the spec says shouldn't exist there.
         assert not hasattr(no_data_widget, "kpi_row")
-        assert not hasattr(no_data_widget, "recent_table")
+        assert not hasattr(no_data_widget, "_raid_nights_layout")
         assert hasattr(active_widget, "kpi_row")
-        assert hasattr(active_widget, "recent_table")
+        assert hasattr(active_widget, "_raid_nights_layout")
     finally:
         db.close()
 
