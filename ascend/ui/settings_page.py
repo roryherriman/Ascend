@@ -56,6 +56,12 @@ def _run_connection_test(progress_cb, cancel_token, client_id: str, client_secre
     return client.test_connection()
 
 
+def _run_discord_summary(progress_cb, cancel_token, db, webhook_url: str):
+    from ascend.services.discord_service import post_weekly_summary
+    progress_cb(40, "Building weekly summary...")
+    return post_weekly_summary(db, webhook_url)
+
+
 def _run_discord_test(progress_cb, cancel_token, webhook_url: str):
     progress_cb(40, "Sending test message to Discord...")
     try:
@@ -455,8 +461,19 @@ class SettingsPage(QWidget):
         test_button.clicked.connect(self._on_test_discord)
         form.addRow("", test_button)
 
-        note = QLabel("Automatic weekly summary posting is available in Phase 4.")
+        summary_button = QPushButton("Post Weekly Summary Now")
+        summary_button.setToolTip(
+            "Post a summary of the last 7 days of raid data to the configured Discord webhook."
+        )
+        summary_button.clicked.connect(self._on_post_discord_summary)
+        form.addRow("", summary_button)
+
+        note = QLabel(
+            "Weekly summary includes raid nights, total pulls, kills, and encounter list "
+            "from the last 7 days. Post it any time using the button above."
+        )
         note.setProperty("class", "muted")
+        note.setWordWrap(True)
         form.addRow("", note)
         return group
 
@@ -1027,6 +1044,30 @@ class SettingsPage(QWidget):
     def _on_discord_test_failed(self, message: str) -> None:
         self.task_panel.reset()
         show_error(self, "Discord test failed", message)
+
+    def _on_post_discord_summary(self) -> None:
+        webhook_url = self.discord_webhook_edit.text().strip()
+        if not webhook_url:
+            show_error(self, "Missing webhook", "Enter a Discord webhook URL first.")
+            return
+        self.task_panel.start("Posting weekly summary to Discord...")
+        task = self.task_manager.submit(_run_discord_summary, self.db, webhook_url)
+        self._active_task = task
+        task.signals.progress.connect(self.task_panel.update_progress)
+        task.signals.finished.connect(self._on_discord_summary_finished)
+        task.signals.error.connect(lambda msg: self._on_discord_summary_failed(msg))
+
+    def _on_discord_summary_finished(self, result) -> None:
+        self.task_panel.finish("Done.")
+        ok, detail = result
+        if ok:
+            show_info(self, "Summary posted", detail)
+        else:
+            show_error(self, "Discord post failed", detail)
+
+    def _on_discord_summary_failed(self, message: str) -> None:
+        self.task_panel.reset()
+        show_error(self, "Discord post failed", message)
 
     # -- guild icon management -------------------------------------------
 
