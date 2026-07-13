@@ -38,6 +38,8 @@ from ascend.ui.reports_page import ReportsPage
 from ascend.ui.roster_page import RosterComparisonPage
 from ascend.ui.settings_page import SettingsPage
 from ascend.ui.global_context_bar import GlobalContextBar
+from ascend.ui.goals_page import GoalsPage
+from ascend.ui.encounter_rules_page import EncounterRulesPage
 from ascend.ui.widgets import DemoBanner, PlaceholderPage
 
 PLACEHOLDER_META: dict[str, dict] = {
@@ -50,16 +52,6 @@ PLACEHOLDER_META: dict[str, dict] = {
         note="Readiness will evaluate whether your data supports moving to a more competitive environment.",
         planned=["Readiness classification with evidence", "Largest performance gaps"],
         icon="readiness",
-    ),
-    "goals": dict(
-        note="Goals will let you set measurable targets that update automatically as you analyze reports.",
-        planned=["Measurable goals with automatic progress", "Not Started / In Progress / Achieved / Missed"],
-        icon="goals",
-    ),
-    "rules": dict(
-        note="Encounter Rules let you configure mechanic rules. Available in Settings > Advanced.",
-        planned=["Priority targets and avoidable-damage rules", "YAML import/export"],
-        icon="rules",
     ),
     "export": dict(
         note="Export options are available from Reports and Raid Night pages, and in Settings > Data & Privacy.",
@@ -342,6 +334,10 @@ class MainWindow(QMainWindow):
                 page = SettingsPage(self.db, self.secure_storage, self.task_manager)
             elif key == "diagnostics":
                 page = DiagnosticsPage(self.db, self.secure_storage)
+            elif key == "goals":
+                page = GoalsPage(self.db)
+            elif key == "rules":
+                page = EncounterRulesPage(self.db)
             else:
                 meta = PLACEHOLDER_META.get(key, {})
                 page = PlaceholderPage(
