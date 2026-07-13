@@ -1,9 +1,10 @@
-"""Export - save raid analysis data to CSV or HTML.
+"""Export - save raid analysis data to CSV, HTML, or JSON.
 
 Exports data that is already ingested and verified:
   - Encounter Summary: boss, total pulls, kills, wipes, first kill pull, progression pulls, farm pulls
   - Roster Attendance: player, server, class, raid nights, pulls
   - Combined HTML report (both tables plus basic metadata)
+  - Full JSON export (all tables in one machine-readable file)
 
 Performance stats (DPS, mechanic pass rates) aren't exported here because
 they don't exist yet in the ingested data. The export is honest about what's
@@ -13,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
@@ -131,6 +133,17 @@ _HTML_STYLE = textwrap.dedent("""
 """)
 
 
+def export_json(db: Database) -> str:
+    from ascend.metadata import APP_VERSION
+    payload = {
+        "ascend_version": APP_VERSION,
+        "generated_at": _now_utc(),
+        "encounter_summary": _encounter_summary_rows(db),
+        "roster_attendance": _roster_attendance_rows(db),
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False)
+
+
 def export_html(db: Database) -> str:
     enc_rows = _encounter_summary_rows(db)
     roster_rows = _roster_attendance_rows(db)
@@ -223,6 +236,21 @@ class ExportPage(QWidget):
         html_layout.addWidget(html_btn)
         layout.addWidget(html_group)
 
+        # Full JSON export
+        json_group = QGroupBox("Full JSON Export")
+        json_layout = QVBoxLayout(json_group)
+        json_desc = QLabel(
+            "All tables in one machine-readable JSON file. "
+            "Useful for scripting, spreadsheet import, or external analysis tools."
+        )
+        json_desc.setWordWrap(True)
+        json_desc.setProperty("class", "muted")
+        json_layout.addWidget(json_desc)
+        json_btn = QPushButton("Save as JSON…")
+        json_btn.clicked.connect(self._export_json)
+        json_layout.addWidget(json_btn)
+        layout.addWidget(json_group)
+
         layout.addWidget(self._status)
         layout.addStretch()
 
@@ -271,5 +299,16 @@ class ExportPage(QWidget):
             html = export_html(self.db)
             Path(path).write_text(html, encoding="utf-8")
             self._set_status(f"Saved HTML report → {path}")
+        except OSError as exc:
+            self._set_status(f"Save failed: {exc}", ok=False)
+
+    def _export_json(self) -> None:
+        path = self._save_file("Save JSON Export", "JSON files (*.json)", "ascend_export.json")
+        if not path:
+            return
+        try:
+            data = export_json(self.db)
+            Path(path).write_text(data, encoding="utf-8")
+            self._set_status(f"Saved JSON export → {path}")
         except OSError as exc:
             self._set_status(f"Save failed: {exc}", ok=False)
