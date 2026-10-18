@@ -1,3 +1,4 @@
+import threading
 import time
 
 from ascend.services.background_worker import BackgroundTaskManager
@@ -6,6 +7,21 @@ from ascend.services.background_worker import BackgroundTaskManager
 def _add(progress_cb, _cancel_token, a, b):
     progress_cb(50, "adding")
     return a + b
+
+
+def _gated(fn):
+    """Hold the worker until the test has connected to its signals.
+
+    submit() starts the task immediately, and a signal emitted before
+    qtbot.waitSignal connects is lost, so an instant task races the test.
+    """
+    gate = threading.Event()
+
+    def run(progress_cb, cancel_token, *args):
+        gate.wait(5)
+        return fn(progress_cb, cancel_token, *args)
+
+    return run, gate
 
 
 def _wait_for_cancellation(progress_cb, cancel_token):
@@ -18,10 +34,11 @@ def _wait_for_cancellation(progress_cb, cancel_token):
 
 def test_background_task_completes_successfully(qtbot):
     manager = BackgroundTaskManager()
-    task = manager.submit(_add, 2, 3)
+    fn, gate = _gated(_add)
+    task = manager.submit(fn, 2, 3)
 
     with qtbot.waitSignal(task.signals.finished, timeout=5000) as blocker:
-        pass
+        gate.set()
 
     assert blocker.args[0] == 5
     assert manager.active_count() == 0
@@ -29,10 +46,11 @@ def test_background_task_completes_successfully(qtbot):
 
 def test_background_task_reports_progress(qtbot):
     manager = BackgroundTaskManager()
-    task = manager.submit(_add, 10, 20)
+    fn, gate = _gated(_add)
+    task = manager.submit(fn, 10, 20)
 
     with qtbot.waitSignal(task.signals.progress, timeout=5000) as blocker:
-        pass
+        gate.set()
 
     percent, message = blocker.args
     assert percent == 50
@@ -56,9 +74,10 @@ def test_background_task_error_is_surfaced(qtbot):
         raise ValueError("boom")
 
     manager = BackgroundTaskManager()
-    task = manager.submit(_raises)
+    fn, gate = _gated(_raises)
+    task = manager.submit(fn)
 
     with qtbot.waitSignal(task.signals.error, timeout=5000) as blocker:
-        pass
+        gate.set()
 
     assert "boom" in blocker.args[0]

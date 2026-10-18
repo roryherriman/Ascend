@@ -243,3 +243,38 @@ class TestDiscordService:
             ok, msg = post_weekly_summary(db, webhook_url="https://discord.com/api/webhooks/fake")
         assert not ok
         assert "timeout" in msg
+
+    def test_rejects_non_discord_url_without_posting(self, tmp_path):
+        from ascend.services.discord_service import post_weekly_summary
+        db = _make_db(tmp_path)
+        with patch("ascend.services.discord_service.requests.post") as mock_post:
+            for url in ("http://discord.com/api/webhooks/1/abc",          # not https
+                        "https://evil.example/api/webhooks/1/abc",         # wrong host
+                        "https://discord.com.evil.example/api/webhooks/1", # lookalike host
+                        "https://discord.com/channels/1/2"):               # not a webhook
+                ok, msg = post_weekly_summary(db, webhook_url=url)
+                assert not ok
+                assert "Discord webhook URL" in msg
+        assert not mock_post.called
+
+    def test_network_error_does_not_leak_webhook_token(self, tmp_path):
+        import requests as req_lib
+        from ascend.services.discord_service import post_weekly_summary
+        db = _make_db(tmp_path)
+        url = "https://discord.com/api/webhooks/123456/SECRET-TOKEN-VALUE"
+        err = req_lib.exceptions.ConnectionError(
+            "HTTPSConnectionPool(host='discord.com', port=443): Max retries exceeded with url: "
+            "/api/webhooks/123456/SECRET-TOKEN-VALUE?wait=true (Caused by timeout)"
+        )
+        with patch("ascend.services.discord_service.requests.post", side_effect=err):
+            ok, msg = post_weekly_summary(db, webhook_url=url)
+        assert not ok
+        assert "SECRET-TOKEN-VALUE" not in msg
+        assert "timeout" in msg
+
+    def test_is_discord_webhook_url_accepts_official_hosts(self):
+        from ascend.services.discord_service import is_discord_webhook_url
+        assert is_discord_webhook_url("https://discord.com/api/webhooks/1/abc")
+        assert is_discord_webhook_url("https://discordapp.com/api/webhooks/1/abc")
+        assert is_discord_webhook_url(" https://ptb.discord.com/api/webhooks/1/abc ")
+        assert not is_discord_webhook_url("")

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+# Least privilege: tests only need to read the repo.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test (Python 3.11, Windows)
