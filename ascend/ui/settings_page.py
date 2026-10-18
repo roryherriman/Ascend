@@ -63,6 +63,13 @@ def _run_discord_summary(progress_cb, cancel_token, db, webhook_url: str):
 
 
 def _run_discord_test(progress_cb, cancel_token, webhook_url: str):
+    from ascend.services.discord_service import (
+        INVALID_WEBHOOK_MESSAGE,
+        is_discord_webhook_url,
+        redact_webhook,
+    )
+    if not is_discord_webhook_url(webhook_url):
+        return False, INVALID_WEBHOOK_MESSAGE
     progress_cb(40, "Sending test message to Discord...")
     try:
         response = requests.post(
@@ -71,7 +78,7 @@ def _run_discord_test(progress_cb, cancel_token, webhook_url: str):
             timeout=10,
         )
     except requests.exceptions.RequestException as exc:
-        return False, str(exc)
+        return False, redact_webhook(str(exc), webhook_url)
     return response.status_code in (200, 204), response.status_code
 
 

@@ -5,13 +5,48 @@ Uses only data already in the local SQLite database — no live API calls.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 import requests
 
 from ascend.data.database import Database
 from ascend.data.repositories import ReportRepository
 from ascend.metadata import APP_NAME, APP_VERSION
+
+_DISCORD_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
+# A webhook URL is itself a credential: the path segment after the ID is the token.
+_WEBHOOK_PATH_RE = re.compile(r"/api/webhooks/[^\s'\"<>)]*")
+
+INVALID_WEBHOOK_MESSAGE = (
+    "That doesn't look like a Discord webhook URL. "
+    "It should start with https://discord.com/api/webhooks/."
+)
+
+
+def is_discord_webhook_url(url: str) -> bool:
+    """True only for https Discord webhook URLs, so summaries can't be sent to another host."""
+    try:
+        parts = urlsplit((url or "").strip())
+    except ValueError:
+        return False
+    return (
+        parts.scheme == "https"
+        and (parts.hostname or "").lower() in _DISCORD_HOSTS
+        and parts.path.startswith("/api/webhooks/")
+    )
+
+
+def redact_webhook(text: str, webhook_url: str | None = None) -> str:
+    """Strip webhook URLs/tokens from error text before it is shown or logged.
+
+    requests' exception messages include the request URL, which for a webhook
+    contains its secret token.
+    """
+    if webhook_url:
+        text = text.replace(webhook_url.strip(), "<discord webhook>")
+    return _WEBHOOK_PATH_RE.sub("/api/webhooks/<redacted>", text)
 
 
 def _recent_week_reports(db: Database, days: int = 7) -> list:
@@ -83,6 +118,8 @@ def post_weekly_summary(
     """Post the weekly summary to `webhook_url`. Returns (ok, message)."""
     if not webhook_url:
         return False, "No Discord webhook URL configured."
+    if not is_discord_webhook_url(webhook_url):
+        return False, INVALID_WEBHOOK_MESSAGE
 
     summary = build_weekly_summary(db, days)
     try:
@@ -92,7 +129,7 @@ def post_weekly_summary(
             timeout=timeout,
         )
     except requests.exceptions.RequestException as exc:
-        return False, str(exc)
+        return False, redact_webhook(str(exc), webhook_url)
 
     if resp.status_code in (200, 204):
         return True, "Summary posted to Discord."
