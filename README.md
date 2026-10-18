@@ -60,8 +60,9 @@ The scoring model is specified in [`docs/ASCEND_SCORING.md`](docs/ASCEND_SCORING
 ## Your data stays on your machine
 
 - All analysis, history and settings live in SQLite under `%LOCALAPPDATA%\Ascend\`.
-- Warcraft Logs and Battle.net secrets go into **Windows Credential Manager** (with a DPAPI fallback). They never go into the database, config files, logs, exports or the built binary.
-- Ascend only connects to the Warcraft Logs API (and, optionally, Battle.net), and only when you fetch something.
+- Your Warcraft Logs and Battle.net client secrets and your Discord webhook URL go into **Windows Credential Manager**. If that's unavailable, they fall back to a DPAPI-encrypted file. On systems with neither, they fall back to an obfuscated (not encrypted) file, and Settings shows a warning. They never go into the database, logs or exports.
+- Ascend only connects to the Warcraft Logs API when you fetch something. It connects to the Battle.net API only if you add Battle.net credentials for guild crests, and to Discord only when you post a summary to your own webhook. The Discord summary contains totals and boss names, not player names.
+- Downloaded report data is kept in that local database until you delete it. Delete the `Ascend` folder to remove everything.
 - **File → Back Up Ascend Data** creates a timestamped backup. **Restore** brings it back.
 
 ## Run from source
@@ -85,7 +86,7 @@ Tests use pytest and pytest-qt:
 
 ## Development status
 
-**Completed, v1.0.0.** All 15 planned productisation PRs have landed. The suite has 389 tests covering the data layer, API layer, sync, scoring and every UI page. CI runs on every push, and tagged releases build and upload the portable Windows ZIP. See [`CHANGELOG.md`](CHANGELOG.md).
+**Completed, v1.0.0.** All 15 planned productisation PRs have landed. The suite has 400+ tests covering the data layer, API layer, sync, scoring and every UI page, and CI runs them on every push. A release workflow builds the portable Windows ZIP from version tags. See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Known limitations
 
@@ -100,8 +101,8 @@ See [`docs/ROADMAP.md`](docs/ROADMAP.md) and the issue tracker.
 
 ## Licence
 
-*No licence has been chosen yet.* Until one is added, all rights are reserved. Class icon and asset sourcing is documented in [`docs/ASSET_LICENSES.md`](docs/ASSET_LICENSES.md).
+*No licence has been chosen yet.* Until one is added, all rights are reserved. Class icon and asset sourcing is documented in [`docs/ASSET_LICENSES.md`](docs/ASSET_LICENSES.md), and bundled third-party software is listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ---
 
-<sub>Ascend is an independent community project. It isn't affiliated with, endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs. World of Warcraft and related trademarks belong to Blizzard Entertainment.</sub>
+<sub>Ascend is an independent, unofficial community project. It isn't affiliated with, endorsed by, or sponsored by Blizzard Entertainment, Warcraft Logs or RPGLogs. Report data comes from the Warcraft Logs API. Optional guild crests come from the Blizzard Battle.net API, and Blizzard is the source of that data. World of Warcraft and related trademarks belong to Blizzard Entertainment.</sub>
