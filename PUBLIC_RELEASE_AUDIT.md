@@ -118,6 +118,7 @@ None.
 | L7 | Rate limits are only checked reactively (HTTP 429 → error, no retry) | `ascend/api/client.py:89-93` | Compliant with RPGLogs ToS §2(e) (no circumvention). Optional: read `rateLimitData` before bulk guild syncs. |
 | L8 | Releases are unsigned | README | Already disclosed. Code signing is optional. |
 | L9 | **Settings → Reset** doesn't remove the Battle.net client secret, backups, logs or exports | `ascend/ui/settings_page.py:1322-1350` | Disclosed in PRIVACY.md. Recommend adding a "clear Battle.net secret" option and an "also delete backups and logs" option. |
+| L10 | Background-task race: `BackgroundTaskManager.submit()` starts the task before callers connect to its signals (`ascend/services/background_worker.py:79-90`; e.g. `settings_page.py` connects after `submit`). An instant task can finish unheard, leaving a progress panel stuck. This caused a CI failure on PR #78. | `test_background_worker.py` | **Test fixed** (workers are gated until the test connects). **UI hardened**: webhook URLs are validated before any task starts. **Recommended (approval):** let `submit()` accept callbacks and connect them before `pool.start()`. |
 
 ### Cleared (checked, no issue)
 

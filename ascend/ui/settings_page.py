@@ -62,6 +62,16 @@ def _run_discord_summary(progress_cb, cancel_token, db, webhook_url: str):
     return post_weekly_summary(db, webhook_url)
 
 
+def _webhook_url_ok(parent, webhook_url: str) -> bool:
+    """Validate before starting a background task: an instant early return inside the
+    worker could finish before the caller has connected to its signals."""
+    from ascend.services.discord_service import INVALID_WEBHOOK_MESSAGE, is_discord_webhook_url
+    if is_discord_webhook_url(webhook_url):
+        return True
+    show_error(parent, "Invalid webhook", INVALID_WEBHOOK_MESSAGE)
+    return False
+
+
 def _run_discord_test(progress_cb, cancel_token, webhook_url: str):
     from ascend.services.discord_service import (
         INVALID_WEBHOOK_MESSAGE,
@@ -1030,7 +1040,9 @@ class SettingsPage(QWidget):
     def _on_test_discord(self) -> None:
         webhook_url = self.discord_webhook_edit.text().strip()
         if not webhook_url:
-            show_error(self, "Missing webhook", "Enter a Discord webhook URL first.")
+            show_error(self, "Missing webhook", "Enter a Discord webhook URL first.")
+            return
+        if not _webhook_url_ok(self, webhook_url):
             return
 
         self.task_panel.start("Testing Discord webhook...")
@@ -1055,7 +1067,9 @@ class SettingsPage(QWidget):
     def _on_post_discord_summary(self) -> None:
         webhook_url = self.discord_webhook_edit.text().strip()
         if not webhook_url:
-            show_error(self, "Missing webhook", "Enter a Discord webhook URL first.")
+            show_error(self, "Missing webhook", "Enter a Discord webhook URL first.")
+            return
+        if not _webhook_url_ok(self, webhook_url):
             return
         self.task_panel.start("Posting weekly summary to Discord...")
         task = self.task_manager.submit(_run_discord_summary, self.db, webhook_url)
