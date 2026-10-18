@@ -2,7 +2,7 @@
 
 **Repository:** https://github.com/roryherriman/Ascende (public since 2026-10-18)
 **Audited:** 2026-10-18, at `main` = `a8e6068`, plus every branch, all 5 tags, all 51 GitHub PR refs, and all 5 published release ZIPs
-**Fixes branch:** `audit/public-release-fixes`. `PRIVACY.md` is a draft held back for review and isn't part of this branch yet
+**Fixes branch:** `audit/public-release-fixes` (PR #78)
 
 > This is an engineering audit, not legal advice. Passing automated checks doesn't make the project legally safe. Where a conclusion depends on a third party's terms, the source is cited, and anything I couldn't confirm is listed in §10.
 
@@ -58,7 +58,7 @@ None.
 
 **H4. No privacy policy, which both API terms require** (Confirmed · Draft created)
 - Policy: [RPGLogs API ToS §3(d)](https://www.archon.gg/classic-mop/articles/help/rpg-logs-api-terms-of-service) says "You will provide and adhere to a privacy policy for your API Client…". [Blizzard Developer API ToU §2 item 15](https://www.blizzard.com/en-gb/legal/a2989b50-5f16-43b1-abec-2ae17cc09dd6/blizzard-developer-api-terms-of-use) says "You must post a privacy policy governing the use of the Data…".
-- Fix prepared: `PRIVACY.md` drafted from the actual code: what's stored, where, what's sent and to whom, credentials, exports with player names, deletion. It's held back from this branch for review. Add a README link when it's committed.
+- Fix applied: `PRIVACY.md`, written only from behaviour verified in the code (stored fields per table, credential storage tiers, outbound services, export contents, combat-log metadata-only check, Reset scope, deletion). The README links it.
 - **Still needed (approval):** review the wording, then commit and publish it. Consider linking it in-app (About / Settings).
 
 **H5. Indefinite local storage of Warcraft Logs API content** (Potential · Needs clarification from RPGLogs)
@@ -117,6 +117,7 @@ None.
 | L6 | Exports (JSON/CSV/HTML) include other players' names, realms and classes | `ascend/ui/export_page.py:77-89` | Documented in PRIVACY.md. Consider an "anonymise names" export option. |
 | L7 | Rate limits are only checked reactively (HTTP 429 → error, no retry) | `ascend/api/client.py:89-93` | Compliant with RPGLogs ToS §2(e) (no circumvention). Optional: read `rateLimitData` before bulk guild syncs. |
 | L8 | Releases are unsigned | README | Already disclosed. Code signing is optional. |
+| L9 | **Settings → Reset** doesn't remove the Battle.net client secret, backups, logs or exports | `ascend/ui/settings_page.py:1322-1350` | Disclosed in PRIVACY.md. Recommend adding a "clear Battle.net secret" option and an "also delete backups and logs" option. |
 
 ### Cleared (checked, no issue)
 
@@ -147,7 +148,7 @@ None.
 | `README.md` | Accurate connectivity/secret/retention claims, test count, attribution, links to PRIVACY and notices |
 | `CLASS_ICON_SOURCES.md` | Accurate release status, current Blizzard ToU link, 30-day TTL guidance |
 | `THIRD_PARTY_NOTICES.md` | **New:** bundled component licences and attribution |
-| `PRIVACY.md` | **New (draft, not committed yet):** data-handling notice, pending review |
+| `PRIVACY.md` | **New:** data-handling notice (verified against the code) |
 | `PUBLIC_RELEASE_AUDIT.md` | **New:** this report |
 
 **Verification:**
@@ -159,7 +160,7 @@ None.
 ## 9. Needs your approval
 
 1. **Commit and push** the fixes branch (or merge it into `main`).
-2. **Publish `PRIVACY.md`** after reviewing the wording (it's marked DRAFT).
+2. **Approve `PRIVACY.md`** (on the PR branch).
 3. **Rebuild and replace the release** with current Python, urllib3 ≥ 2.8.0, no Virtual Keyboard, and notices included (H1–H3, M4). For example, tag v1.0.1 and let the fixed workflow build it. Decide whether to delete or annotate the older release assets that contain the GPL component.
 4. **Choose a licence** (recommendation: MIT) (M7).
 5. **Enable** secret scanning, push protection and Dependabot alerts (M8).

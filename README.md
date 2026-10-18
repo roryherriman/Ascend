@@ -64,6 +64,7 @@ The scoring model is specified in [`docs/ASCEND_SCORING.md`](docs/ASCEND_SCORING
 - Ascend only connects to the Warcraft Logs API when you fetch something. It connects to the Battle.net API only if you add Battle.net credentials for guild crests, and to Discord only when you post a summary to your own webhook. The Discord summary contains totals and boss names, not player names.
 - Downloaded report data is kept in that local database until you delete it. Delete the `Ascend` folder to remove everything.
 - **File → Back Up Ascend Data** creates a timestamped backup. **Restore** brings it back.
+- See [`PRIVACY.md`](PRIVACY.md) for the full data-handling notice.
 
 ## Run from source
 
