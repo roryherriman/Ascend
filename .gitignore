@@ -10,6 +10,8 @@ __pycache__/
 # PyInstaller build output
 build/
 dist/
+dist*/
+Ascend-*.zip
 *.spec.bak
 # Ascend.spec is tracked (authoritative build config) — generated artefacts are not
 version_info.txt

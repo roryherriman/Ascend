@@ -45,6 +45,8 @@ a = Analysis(
         (str(ROOT / "ascend" / "resources" / "demo_report.json"), "ascend/resources"),
         # Roadmap shown in the About / Roadmap widget
         (str(ROOT / "docs" / "ROADMAP.md"), "docs"),
+        # License notices for bundled third-party components (LGPL/MPL/Apache require them)
+        (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
     ],
     hiddenimports=[
         # keyring Windows Credential Manager backend
@@ -86,6 +88,23 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Qt Virtual Keyboard is GPL-3.0/commercial only (not LGPL) and Ascend doesn't use it.
+# The PySide6 hook collects it automatically, so drop the module and its input-context plugin.
+_GPL_ONLY_QT = ("qt6virtualkeyboard", "qtvirtualkeyboard")
+
+
+def _keep(entry):
+    name = entry[0].replace("\\", "/").lower()
+    if any(marker in name for marker in _GPL_ONLY_QT):
+        return False
+    # Blizzard class-icon images (scripts/fetch_assets.py) are local-only and must never ship:
+    # Blizzard API data has a 30-day TTL. See CLASS_ICON_SOURCES.md.
+    return not ("class_icons/" in name and name.endswith((".png", ".jpg", ".jpeg")))
+
+
+a.binaries = [b for b in a.binaries if _keep(b)]
+a.datas = [d for d in a.datas if _keep(d)]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
