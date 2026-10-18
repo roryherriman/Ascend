@@ -54,7 +54,8 @@ None.
 **H3. Every release runs an outdated Python with end-of-life OpenSSL** (Confirmed · Needs rebuild)
 - Evidence (PE version resources in all 5 ZIPs): `python311.dll` 3.11.0, `libssl-1_1.dll`/`libcrypto-1_1.dll` **1.1.1q**, `sqlite3.dll` 3.38.4. Python 3.11.0's `ssl` module uses OpenSSL 1.1.1, so **all HTTPS traffic** (Warcraft Logs, Battle.net, Discord) goes through it. OpenSSL 1.1.1 has been end of life since September 2023.
 - Cause: the releases were built from the local `.venv` (Python 3.11.0). The v1.0.0 tag's release workflow failed at "Upload release asset" (see M5), so the published v1.0.0 ZIP (sha256 `5a56a32c…`) matches the local `dist/` build.
-- Fix: rebuild with the newest Python 3.11.x or 3.12.x, ideally via the (now fixed) release workflow. **Approval needed.**
+- Root cause traced: OpenSSL 1.1 is linked by Python 3.11.0's own `_ssl.pyd` and `_hashlib.pyd`. The `libssl-3-x64.dll` (3.5.6) belongs to Qt's TLS plugin and is current. The 1.1 DLLs **can't be swapped in place** (different ABI), so a **full rebuild with a newer Python is required**.
+- Options checked: CI's `setup-python` "3.11" currently installs **3.11.9** (the last 3.11 release with Windows binaries, April 2024; OpenSSL 3.0.x but no later 3.11 security fixes). The locally installed **Python 3.13.14** ships **OpenSSL 3.0.21**. Recommended: build releases on 3.12 or 3.13 after running the suite on that version. **Approval needed.**
 
 **H4. No privacy policy, which both API terms require** (Confirmed · Draft created)
 - Policy: [RPGLogs API ToS §3(d)](https://www.archon.gg/classic-mop/articles/help/rpg-logs-api-terms-of-service) says "You will provide and adhere to a privacy policy for your API Client…". [Blizzard Developer API ToU §2 item 15](https://www.blizzard.com/en-gb/legal/a2989b50-5f16-43b1-abec-2ae17cc09dd6/blizzard-developer-api-terms-of-use) says "You must post a privacy policy governing the use of the Data…".
@@ -104,6 +105,10 @@ None.
 
 **M8. GitHub secret scanning, push protection and Dependabot are disabled** (Confirmed · Approval needed)
 - The API returned "Secret scanning is disabled on this repository" and "Dependabot alerts are disabled". Enabling them is free for public repos.
+
+**M9. "Check for Updates" opens a 404 page in every release** (Confirmed · Approval needed)
+- Evidence: `ascend/metadata.py:14` has `GITHUB_REPO = "roryherriman/Ascend"`, but the repository is `roryherriman/Ascende`. **Help → Check for Updates** (`ascend/main_window.py:186-190`) therefore opens a non-existent page.
+- Fix options: (a) rename the repository to `Ascend`. GitHub redirects the old name, and this **also fixes builds already in users' hands**. (b) Change `GITHUB_REPO` to `roryherriman/Ascende`, which only fixes future builds.
 
 ### LOW
 
