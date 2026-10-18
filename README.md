@@ -1,92 +1,107 @@
-# Ascend
+<h1 align="center">Ascend</h1>
 
-**Understand how you actually perform during progression — not just what color your parse is.**
+<p align="center"><b>Find out how you actually perform across a progression tier, not just what colour your parse is.</b></p>
 
-Ascend is a free Windows desktop app for World of Warcraft raiders. It connects to Warcraft Logs and analyzes your raid history across an entire tier, helping you understand:
+<p align="center">
+  <a href="https://github.com/roryherriman/Ascende/releases/latest"><img src="https://img.shields.io/github/v/release/roryherriman/Ascende?style=flat-square&label=release&color=3fb950" alt="Latest release"></a>
+  <a href="https://github.com/roryherriman/Ascende/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roryherriman/Ascende/ci.yml?style=flat-square&label=CI" alt="CI"></a>
+  <img src="https://img.shields.io/badge/status-completed-3fb950?style=flat-square" alt="Status: completed">
+  <img src="https://img.shields.io/badge/platform-Windows_10%2F11-0078D6?style=flat-square&logo=windows&logoColor=white" alt="Windows 10/11">
+  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11">
+</p>
 
-- whether you are improving
-- how often you die early
-- whether you repeat the same mistakes
-- how consistent your performance is
-- how you compare with your own raid team
-- whether missing data is affecting the result
+<p align="center">
+  <img src="docs/screenshots/redesign_after_demo_dashboard.png" width="90%" alt="Ascend dashboard showing sanitized demo data">
+  <br><sub>Dashboard with sanitized demo data</sub>
+</p>
 
-Ascend is an independent community project and is not affiliated with Blizzard Entertainment or Warcraft Logs.
+Ascend is a free Windows desktop app for World of Warcraft raiders. It connects to Warcraft Logs and looks at your raid history across a whole tier, so you can answer the questions a single parse can't:
 
----
+- Am I improving?
+- How often do I die early, and is it the same death every time?
+- How consistent am I from pull to pull?
+- How do I compare with my own raid team?
+- Is missing data skewing any of this?
 
-## Download
+## Features
 
-Download the latest portable build from the **Releases** page:
+| Area | What you get |
+|---|---|
+| **Progression timeline** | Every pull, every boss, every raid night, plus how your kill rate changed across progression |
+| **Death review** | How often you die early, and which deaths you keep repeating |
+| **Performance score** | Seven categories (survival, execution, damage, consistency, learning, utility, participation). Each one has a confidence level and shows how it was calculated, input by input. |
+| **Roster comparison** | Your attendance and performance compared with your raidmates |
+| **Guild discovery** | Syncs recent guild reports from Warcraft Logs, tagged by source (manual or discovered) |
+| **Goals & encounter rules** | Set targets and per-encounter rules that feed the insights |
+| **Data quality** | Tells you when the data is missing or too thin to score reliably |
+| **Export** | JSON export and a weekly summary formatted for Discord |
+| **Combat log helper** | Finds your local `WoWCombatLog.txt` and opens the Warcraft Logs uploader |
 
-**[Ascend-Portable-0.2.0.zip](https://github.com/roryherriman/Ascende/releases/tag/v0.2.0)**
+The scoring model is specified in [`docs/ASCEND_SCORING.md`](docs/ASCEND_SCORING.md).
 
-Unzip anywhere and run `Ascend.exe`. No installation required.
+## Install
 
-> **Windows SmartScreen** may warn that Ascend is from an unknown publisher. This is expected for an unsigned community tool. Click **More info → Run anyway** to proceed.
+1. Download the latest `Ascend-Portable-*.zip` from **[Releases](https://github.com/roryherriman/Ascende/releases/latest)**.
+2. Unzip it anywhere and run `Ascend.exe`. There's no installer.
+3. The setup wizard asks for:
+   - your Warcraft Logs client credentials (create a free client at [warcraftlogs.com/api/clients](https://www.warcraftlogs.com/api/clients/))
+   - your characters, current tier (detected automatically, but you can override it) and guild
+   - optionally, Battle.net credentials for guild crests
 
-**Windows 10 and 11 (64-bit) are supported.**
+> **Windows SmartScreen** will probably warn that the app is from an unknown publisher, because the build isn't code-signed. Click **More info → Run anyway**.
 
----
+## Usage
 
-## What Ascend does
+1. Open the **Report Library** and paste a Warcraft Logs report URL or code, or let guild discovery pull in recent reports.
+2. Use **Raid Night Summary** for pulls, roster and notes from one night.
+3. Use **Death Review**, **Trends** and **Insights** to see what changes across the tier.
+4. Check **Data Quality** before you trust a score.
 
-Ascend pulls your raid data from Warcraft Logs and organizes it across an entire progression tier — every pull, every boss, every raid night.
+## Your data stays on your machine
 
-From that data it builds:
+- All analysis, history and settings live in SQLite under `%LOCALAPPDATA%\Ascend\`.
+- Warcraft Logs and Battle.net secrets go into **Windows Credential Manager** (with a DPAPI fallback). They never go into the database, config files, logs, exports or the built binary.
+- Ascend only connects to the Warcraft Logs API (and, optionally, Battle.net), and only when you fetch something.
+- **File → Back Up Ascend Data** creates a timestamped backup. **Restore** brings it back.
 
-- a **pull-by-pull timeline** showing when you got each kill and how your kill rate changed across progression
-- a **death breakdown** flagging how often you die early and whether you repeat the same deaths
-- a **performance score** across seven categories (survival, execution, damage, consistency, learning, utility, participation), each with a confidence level based on how much data Ascend actually has
-- a **roster comparison** showing how your attendance and performance compare to your raidmates
-- a **data quality view** that tells you when data is missing or too thin to score reliably
+## Run from source
 
----
-
-## First-time setup
-
-1. Download and unzip `Ascend-Portable-0.2.0.zip`.
-2. Run `Ascend.exe`.
-3. The setup wizard walks you through:
-   - Your display name and preferred region
-   - Warcraft Logs client credentials (create a free client at [warcraftlogs.com/api/clients](https://www.warcraftlogs.com/api/clients/))
-   - A connection test
-   - Your characters (name, realm, class, role)
-   - Your current raid tier and guild rank
-4. Paste a Warcraft Logs report URL into the Dashboard and click **Analyze**.
-
----
-
-## Your data stays on your computer
-
-Ascend is local-first. Everything it stores — raid analysis, character history, settings — lives in a SQLite database on your machine at `%LOCALAPPDATA%\Ascend\`. Nothing is uploaded anywhere.
-
-The only outbound connections Ascend makes are to the Warcraft Logs API when you explicitly fetch a report.
-
-Your Warcraft Logs client secret is stored in Windows Credential Manager, not in a plain-text file.
-
-**Backup:** File → Back Up Ascend Data saves a timestamped copy. File → Restore Ascend Data restores from a backup.
-
----
-
-## Running from source
-
-If you want to run from the Python source instead of the portable build:
-
-1. Install **Python 3.11** (64-bit).
-2. Run `setup.bat` to create the virtual environment and install dependencies.
-3. Run `run_app.bat` to launch Ascend.
-
-To build the portable ZIP yourself:
-
+```bat
+:: Python 3.11, 64-bit
+setup.bat        & :: creates the venv and installs requirements
+run_app.bat      & :: launches Ascend
 ```
+
+```bat
+:: Build the portable ZIP yourself
 scripts\build_portable.bat
 ```
 
+Tests use pytest and pytest-qt:
+
+```bat
+.venv\Scripts\python -m pytest
+```
+
+## Development status
+
+**Completed, v1.0.0.** All 15 planned productisation PRs have landed. The suite has 389 tests covering the data layer, API layer, sync, scoring and every UI page. CI runs on every push, and tagged releases build and upload the portable Windows ZIP. See [`CHANGELOG.md`](CHANGELOG.md).
+
+## Known limitations
+
+- Windows only (the credential storage and packaging are Windows-specific).
+- Scores can only be as good as the logs behind them. Thin or partial reports lower the confidence rather than being hidden.
+- Guild rank isn't computed, because Warcraft Logs doesn't expose it.
+- The build is unsigned, so SmartScreen will warn on first run.
+
+## Roadmap
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) and the issue tracker.
+
+## Licence
+
+*No licence has been chosen yet.* Until one is added, all rights are reserved. Class icon and asset sourcing is documented in [`docs/ASSET_LICENSES.md`](docs/ASSET_LICENSES.md).
+
 ---
 
-## Disclaimer
-
-Ascend is an independent community project and is not affiliated with, endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs.
-
-World of Warcraft and related trademarks are the property of Blizzard Entertainment. Class icons and imagery used in Ascend are sourced in accordance with Blizzard's fan content policies — see [docs/ASSET_LICENSES.md](docs/ASSET_LICENSES.md).
+<sub>Ascend is an independent community project. It isn't affiliated with, endorsed by, or sponsored by Blizzard Entertainment or Warcraft Logs. World of Warcraft and related trademarks belong to Blizzard Entertainment.</sub>
